@@ -1,19 +1,97 @@
-<div class="flex justify-content-center align-items-center h-screen">
-    <p-card header="Regístrate" styleClass="w-25rem">
+<div class="flex justify-content-center align-items-center min-h-screen py-4">
+    <p-card header="Regístrate" styleClass="w-30rem">
 
         <form [formGroup]="form" (ngSubmit)="register()">
 
-            <div class="field">
+            <div class="field mb-3">
+                <label>Usuario</label>
+                <input pInputText formControlName="usuario" class="w-full">
+                <small class="text-red-500 block mt-1"
+                    *ngIf="form.get('usuario')?.invalid && (form.get('usuario')?.dirty || form.get('usuario')?.touched)">
+                    El usuario es obligatorio.
+                </small>
+            </div>
+
+            <div class="field mb-3">
                 <label>Email</label>
                 <input pInputText formControlName="email" class="w-full">
+                <small class="text-red-500 block mt-1"
+                    *ngIf="form.get('email')?.invalid && (form.get('email')?.dirty || form.get('email')?.touched)">
+                    <span *ngIf="form.get('email')?.errors?.['required']">El email es obligatorio.</span>
+                    <span *ngIf="form.get('email')?.errors?.['email']">El formato del email no es válido.</span>
+                </small>
             </div>
 
-            <div class="field">
-                <label>Password</label>
-                <input pPassword formControlName="password" class="w-full">
+            <div class="field mb-3">
+                <label>Nombre Completo</label>
+                <input pInputText formControlName="nombreCompleto" class="w-full">
+                <small class="text-red-500 block mt-1"
+                    *ngIf="form.get('nombreCompleto')?.invalid && (form.get('nombreCompleto')?.dirty || form.get('nombreCompleto')?.touched)">
+                    El nombre completo es obligatorio.
+                </small>
             </div>
 
-            <p-button label="Crear cuenta" type="submit" class="w-full"></p-button>
+            <div class="field mb-3">
+                <label>Dirección</label>
+                <input pInputText formControlName="direccion" class="w-full">
+                <small class="text-red-500 block mt-1"
+                    *ngIf="form.get('direccion')?.invalid && (form.get('direccion')?.dirty || form.get('direccion')?.touched)">
+                    La dirección es obligatoria.
+                </small>
+            </div>
+
+            <div class="flex gap-3 mb-3">
+                <div class="field w-full">
+                    <label>Teléfono</label>
+                    <input pInputText formControlName="telefono" class="w-full">
+                    <small class="text-red-500 block mt-1"
+                        *ngIf="form.get('telefono')?.invalid && (form.get('telefono')?.dirty || form.get('telefono')?.touched)">
+                        <span *ngIf="form.get('telefono')?.errors?.['required']">El teléfono es obligatorio.</span>
+                        <span *ngIf="form.get('telefono')?.errors?.['pattern']">Debe ser numérico de 10 dígitos.</span>
+                    </small>
+                </div>
+
+                <div class="field w-full">
+                    <label>Edad</label>
+                    <input pInputText type="number" formControlName="edad" class="w-full">
+                    <small class="text-red-500 block mt-1"
+                        *ngIf="form.get('edad')?.invalid && (form.get('edad')?.dirty || form.get('edad')?.touched)">
+                        <span *ngIf="form.get('edad')?.errors?.['required']">La edad es obligatoria.</span>
+                        <span *ngIf="form.get('edad')?.errors?.['min']">Debe ser mayor o igual a 18 años.</span>
+                    </small>
+                </div>
+            </div>
+
+            <div class="field mb-3">
+                <label>Contraseña</label>
+                <p-password formControlName="contrasena" styleClass="w-full" [inputStyle]="{'width':'100%'}"
+                    [toggleMask]="true"></p-password>
+                <small class="text-red-500 block mt-1"
+                    *ngIf="form.get('contrasena')?.invalid && (form.get('contrasena')?.dirty || form.get('contrasena')?.touched)">
+                    <span *ngIf="form.get('contrasena')?.errors?.['required']" class="block">La contraseña es
+                        obligatoria.</span>
+                    <span *ngIf="form.get('contrasena')?.errors?.['minlength']" class="block">Mínimo 10
+                        caracteres.</span>
+                    <span *ngIf="form.get('contrasena')?.errors?.['pattern']" class="block">Debe incluir un símbolo (@ #
+                        $ % & * !).</span>
+                </small>
+            </div>
+
+            <div class="field mb-3">
+                <label>Confirmar Contraseña</label>
+                <p-password formControlName="confirmarContrasena" styleClass="w-full" [inputStyle]="{'width':'100%'}"
+                    [feedback]="false" [toggleMask]="true"></p-password>
+                <small class="text-red-500 block mt-1"
+                    *ngIf="form.get('confirmarContrasena')?.invalid && (form.get('confirmarContrasena')?.dirty || form.get('confirmarContrasena')?.touched)">
+                    La confirmación es obligatoria.
+                </small>
+                <small class="text-red-500 block mt-1"
+                    *ngIf="form.get('confirmarContrasena')?.hasError('passwordsMismatch') && (form.get('confirmarContrasena')?.dirty || form.get('confirmarContrasena')?.touched)">
+                    Las contraseñas no coinciden.
+                </small>
+            </div>
+
+            <p-button label="Crear cuenta" type="submit" class="w-full" [disabled]="form.invalid"></p-button>
 
             <div class="mt-3 text-center">
                 <small>¿Ya tienes cuenta? <a routerLink="/login" class="text-primary font-bold cursor-pointer"

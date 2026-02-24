@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
 import { CommonModule } from '@angular/common';
@@ -8,6 +8,16 @@ import { CardModule } from 'primeng/card';
 import { InputTextModule } from 'primeng/inputtext';
 import { PasswordModule } from 'primeng/password';
 import { ButtonModule } from 'primeng/button';
+
+export function passwordsMatchValidator(control: AbstractControl): ValidationErrors | null {
+  const password = control.get('contrasena');
+  const confirmPassword = control.get('confirmarContrasena');
+  if (password && confirmPassword && password.value !== confirmPassword.value && confirmPassword.value) {
+    confirmPassword.setErrors({ passwordsMismatch: true });
+    return { passwordsMismatch: true };
+  }
+  return null;
+}
 
 @Component({
   selector: 'app-register',
@@ -35,17 +45,27 @@ export class RegisterComponent {
     private router: Router
   ) {
     this.form = this.fb.group({
+      usuario: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
-      password: ['', Validators.required]
-    });
+      contrasena: ['', [Validators.required, Validators.minLength(10), Validators.pattern(/.*[@#$%&*!].*/)]],
+      confirmarContrasena: ['', Validators.required],
+      nombreCompleto: ['', Validators.required],
+      direccion: ['', Validators.required],
+      telefono: ['', [Validators.required, Validators.pattern(/^[0-9]{10}$/)]],
+      edad: ['', [Validators.required, Validators.min(18)]]
+    }, { validators: passwordsMatchValidator });
   }
 
   register() {
-    if (this.form.invalid) return;
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
 
-    const { email, password } = this.form.value;
+    const userData = this.form.value;
+    const userToSave = { ...userData, password: userData.contrasena };
 
-    if (this.authService.register(email, password)) {
+    if (this.authService.register(userToSave)) {
       this.success = true;
       this.error = '';
       setTimeout(() => {

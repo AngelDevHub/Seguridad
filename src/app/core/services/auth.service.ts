@@ -23,12 +23,12 @@ export class AuthService {
     return false;
   }
 
-  register(email: string, password: string): boolean {
+  register(userData: any): boolean {
     const users = this.getUsers();
-    if (users.find((u: any) => u.email === email)) {
+    if (users.find((u: any) => u.email === userData.email)) {
       return false; 
     }
-    users.push({ email, password });
+    users.push(userData);
     localStorage.setItem('users', JSON.stringify(users));
     return true;
   }
