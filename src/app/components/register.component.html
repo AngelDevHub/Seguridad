@@ -1,0 +1,31 @@
+<div class="flex justify-content-center align-items-center h-screen">
+    <p-card header="Regístrate" styleClass="w-25rem">
+
+        <form [formGroup]="form" (ngSubmit)="register()">
+
+            <div class="field">
+                <label>Email</label>
+                <input pInputText formControlName="email" class="w-full">
+            </div>
+
+            <div class="field">
+                <label>Password</label>
+                <input pPassword formControlName="password" class="w-full">
+            </div>
+
+            <p-button label="Crear cuenta" type="submit" class="w-full"></p-button>
+
+            <div class="mt-3 text-center">
+                <small>¿Ya tienes cuenta? <a routerLink="/login" class="text-primary font-bold cursor-pointer"
+                        style="text-decoration: none;">Inicia sesión</a></small>
+            </div>
+
+            <div class="mt-3 text-center">
+                <small class="text-red-500" *ngIf="error">{{ error }}</small>
+                <small class="text-green-500" *ngIf="success">Registro exitoso. Redirigiendo...</small>
+            </div>
+
+        </form>
+
+    </p-card>
+</div>
