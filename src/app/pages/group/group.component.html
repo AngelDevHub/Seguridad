@@ -1,0 +1,46 @@
+<div>
+    <div class="page-header">
+        <h1 class="page-title">Gestión de Grupos</h1>
+        <p class="page-subtitle">Resumen de métricas del grupo actual.</p>
+    </div>
+
+    <div class="cards-grid">
+
+        <!-- Total Card -->
+        <p-card>
+            <div class="stat-card-inner">
+                <div>
+                    <p class="stat-label">Total N</p>
+                    <span class="stat-value">{{ groupData.total() }}</span>
+                </div>
+                <div class="stat-icon purple-bg">
+                    <i class="pi pi-database stat-icon-inner"></i>
+                </div>
+            </div>
+            <div class="stat-footer">
+                <p-progressBar [value]="groupData.progressPercent()" [showValue]="false" />
+                <p class="stat-footer-note">{{ groupData.progressPercent() }}% completado</p>
+            </div>
+        </p-card>
+
+        <!-- Advances Card -->
+        <p-card>
+            <div class="stat-card-inner">
+                <div>
+                    <p class="stat-label">Advances</p>
+                    <span class="stat-value primary">{{ groupData.advances() }}</span>
+                </div>
+                <div class="stat-icon green-bg">
+                    <i class="pi pi-chart-line stat-icon-inner"></i>
+                </div>
+            </div>
+            <div class="stat-footer">
+                <div class="stat-footer-badges">
+                    <p-tag value="Activo" severity="success" [rounded]="true" />
+                    <span class="stat-footer-cycle">Ciclo actual</span>
+                </div>
+            </div>
+        </p-card>
+
+    </div>
+</div>

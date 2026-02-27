@@ -1,0 +1,110 @@
+<div>
+    <div class="page-header">
+        <h1 class="page-title">Profile Data</h1>
+        <p class="page-subtitle">Datos del usuario registrado en el sistema.</p>
+    </div>
+
+    <p-card styleClass="profile-card">
+
+        <!-- Hero: Avatar + Nombre + Rol -->
+        <div class="profile-hero">
+            <p-avatar [label]="profile().nombreCompleto.charAt(0)" size="xlarge" shape="circle" />
+            <div>
+                <h2 class="profile-name">{{ profile().nombreCompleto }}</h2>
+                <p class="profile-username">@{{ profile().usuario }}</p>
+                <div class="hero-tags">
+                    <p-tag [value]="profile().rol" severity="info" [rounded]="true" />
+                </div>
+            </div>
+        </div>
+
+        <p-divider />
+
+        <!-- Sección: Información de Cuenta -->
+        <p class="section-title">Información de cuenta</p>
+        <div class="fields-grid">
+
+            <div class="field-group">
+                <p class="field-label">Usuario</p>
+                <div class="field-value">
+                    <i class="pi pi-at"></i>
+                    {{ profile().usuario }}
+                </div>
+            </div>
+
+            <div class="field-group">
+                <p class="field-label">Correo electrónico</p>
+                <div class="field-value">
+                    <i class="pi pi-envelope"></i>
+                    {{ profile().email }}
+                </div>
+            </div>
+
+        </div>
+
+        <p-divider />
+
+        <!-- Sección: Información Personal -->
+        <p class="section-title">Información personal</p>
+        <div class="fields-grid">
+
+            <div class="field-group">
+                <p class="field-label">Nombre completo</p>
+                <div class="field-value">
+                    <i class="pi pi-user"></i>
+                    {{ profile().nombreCompleto }}
+                </div>
+            </div>
+
+            <div class="field-group">
+                <p class="field-label">Edad</p>
+                <div class="field-value">
+                    <i class="pi pi-calendar"></i>
+                    {{ profile().edad }} años
+                </div>
+            </div>
+
+            <div class="field-group">
+                <p class="field-label">Teléfono</p>
+                <div class="field-value">
+                    <i class="pi pi-phone"></i>
+                    {{ profile().telefono }}
+                </div>
+            </div>
+
+            <div class="field-group">
+                <p class="field-label">Dirección</p>
+                <div class="field-value">
+                    <i class="pi pi-map-marker"></i>
+                    {{ profile().direccion }}
+                </div>
+            </div>
+
+        </div>
+
+        <p-divider />
+
+        <!-- Sección: Datos del sistema -->
+        <p class="section-title">Datos del sistema</p>
+        <div class="fields-grid">
+
+            <div class="field-group">
+                <p class="field-label">Rol</p>
+                <div class="field-value">
+                    <i class="pi pi-shield"></i>
+                    {{ profile().rol }}
+                </div>
+            </div>
+
+            <div class="field-group">
+                <p class="field-label">Miembro desde</p>
+                <div class="field-value">
+                    <i class="pi pi-clock"></i>
+                    {{ profile().fechaRegistro }}
+                </div>
+            </div>
+
+        </div>
+
+    </p-card>
+</div>

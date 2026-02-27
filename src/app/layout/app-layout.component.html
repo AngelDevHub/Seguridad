@@ -1,0 +1,56 @@
+<div class="layout-wrapper">
+
+    <!-- ========== SIDEBAR ========== -->
+    <aside class="sidebar" [class.collapsed]="isCollapsed()">
+
+        <!-- Header -->
+        <div class="sidebar-header">
+            <div class="sidebar-brand">
+                <div class="sidebar-logo">
+                    <i class="pi pi-bolt"></i>
+                </div>
+                <div class="sidebar-text">
+                    <div class="sidebar-title">{{ projectName() }}</div>
+                    <div class="sidebar-subtitle">Dashboard</div>
+                </div>
+            </div>
+            <button class="toggle-btn" (click)="toggleSidebar()" [title]="isCollapsed() ? 'Expandir' : 'Colapsar'">
+                <i class="pi pi-chevron-left" [class.pi-chevron-left]="!isCollapsed()"
+                    [class.pi-chevron-right]="isCollapsed()"></i>
+            </button>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="sidebar-nav">
+            <p class="nav-section-label">Botones Rutas</p>
+            <ul class="nav-list">
+                <li>
+                    <a routerLink="/group" routerLinkActive="active-link" class="nav-link"
+                        [title]="isCollapsed() ? 'Grupos' : ''">
+                        <i class="pi pi-users"></i>
+                        <span class="nav-label">Grupos</span>
+                    </a>
+                </li>
+                <li>
+                    <a routerLink="/user" routerLinkActive="active-link" class="nav-link"
+                        [title]="isCollapsed() ? 'Perfil' : ''">
+                        <i class="pi pi-id-card"></i>
+                        <span class="nav-label">Perfil</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Footer -->
+        <div class="sidebar-footer">
+            <i class="pi pi-info-circle"></i>
+            <span class="footer-text">App {{ appVersion() }}</span>
+        </div>
+    </aside>
+
+    <!-- ========== MAIN CONTENT ========== -->
+    <main class="main-content">
+        <router-outlet />
+    </main>
+
+</div>
