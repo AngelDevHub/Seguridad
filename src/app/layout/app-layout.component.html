@@ -1,56 +1,72 @@
-<div class="layout-wrapper">
+<!-- ── Shell ── -->
+<div class="flex h-screen overflow-hidden surface-ground">
 
-    <!-- ========== SIDEBAR ========== -->
-    <aside class="sidebar" [class.collapsed]="isCollapsed()">
+    <!-- ══ SIDEBAR ══ -->
+    <aside class="flex flex-column surface-0 border-right-1 surface-border shadow-1"
+        [style.width]="isCollapsed() ? '64px' : '240px'" [style.min-width]="isCollapsed() ? '64px' : '240px'"
+        style="height:100%; overflow:hidden; transition:width 0.25s ease">
 
-        <!-- Header -->
-        <div class="sidebar-header">
-            <div class="sidebar-brand">
-                <div class="sidebar-logo">
-                    <i class="pi pi-bolt"></i>
-                </div>
-                <div class="sidebar-text">
-                    <div class="sidebar-title">{{ projectName() }}</div>
-                    <div class="sidebar-subtitle">Dashboard</div>
-                </div>
+        <!-- Header: Logo + Nombre del proyecto -->
+        <div class="flex align-items-center gap-2 px-3 py-3 border-bottom-1 surface-border"
+            style="min-height:64px; overflow:hidden">
+            <div class="flex align-items-center justify-content-center border-circle bg-primary"
+                style="width:36px; height:36px; min-width:36px">
+                <i class="pi pi-bolt text-white text-sm"></i>
             </div>
-            <button class="toggle-btn" (click)="toggleSidebar()" [title]="isCollapsed() ? 'Expandir' : 'Colapsar'">
-                <i class="pi pi-chevron-left" [class.pi-chevron-left]="!isCollapsed()"
-                    [class.pi-chevron-right]="isCollapsed()"></i>
-            </button>
+            @if (!isCollapsed()) {
+            <span class="font-bold text-900 white-space-nowrap" style="font-size:0.95rem">
+                {{ projectName() }}
+            </span>
+            }
         </div>
 
-        <!-- Navigation -->
-        <nav class="sidebar-nav">
-            <p class="nav-section-label">Botones Rutas</p>
-            <ul class="nav-list">
-                <li>
-                    <a routerLink="/group" routerLinkActive="active-link" class="nav-link"
-                        [title]="isCollapsed() ? 'Grupos' : ''">
-                        <i class="pi pi-users"></i>
-                        <span class="nav-label">Grupos</span>
-                    </a>
-                </li>
-                <li>
-                    <a routerLink="/user" routerLinkActive="active-link" class="nav-link"
-                        [title]="isCollapsed() ? 'Perfil' : ''">
-                        <i class="pi pi-id-card"></i>
-                        <span class="nav-label">Perfil</span>
-                    </a>
-                </li>
-            </ul>
+        <!-- Toggle btn -->
+        <div class="flex justify-content-end px-2 py-2">
+            <p-button [icon]="isCollapsed() ? 'pi pi-chevron-right' : 'pi pi-chevron-left'" [text]="true"
+                [rounded]="true" severity="secondary" (onClick)="toggleSidebar()"
+                [pTooltip]="isCollapsed() ? 'Expandir' : ''" tooltipPosition="right" />
+        </div>
+
+        <!-- Nav links -->
+        <nav class="flex flex-column gap-1 px-2 flex-1">
+            @if (!isCollapsed()) {
+            <small class="text-500 font-semibold uppercase px-2 mb-1" style="font-size:0.65rem; letter-spacing:0.1em">
+                BOTONES RUTAS
+            </small>
+            }
+
+            <!-- Grupos -->
+            <a routerLink="/group" [style]="navStyle('group', false)" [pTooltip]="isCollapsed() ? 'Grupos' : ''"
+                tooltipPosition="right">
+                <i class="pi pi-users text-lg" style="min-width:20px; text-align:center"></i>
+                @if (!isCollapsed()) { <span>Grupos</span> }
+            </a>
+
+            <!-- Perfil -->
+            <a routerLink="/user" [style]="navStyle('user', false)" [pTooltip]="isCollapsed() ? 'Perfil' : ''"
+                tooltipPosition="right">
+                <i class="pi pi-user text-lg" style="min-width:20px; text-align:center"></i>
+                @if (!isCollapsed()) { <span>Perfil</span> }
+            </a>
         </nav>
 
-        <!-- Footer -->
-        <div class="sidebar-footer">
+        <!-- Footer: versión -->
+        <div class="px-3 py-3 border-top-1 surface-border text-500"
+            style="font-size:0.75rem; white-space:nowrap; overflow:hidden">
+            @if (!isCollapsed()) {
+            <span>App {{ appVersion() }}</span>
+            } @else {
             <i class="pi pi-info-circle"></i>
-            <span class="footer-text">App {{ appVersion() }}</span>
+            }
         </div>
+
     </aside>
 
-    <!-- ========== MAIN CONTENT ========== -->
-    <main class="main-content">
-        <router-outlet />
+    <!-- ══ MAIN CONTENT ══ -->
+    <main class="flex-1 flex flex-column overflow-y-auto surface-ground">
+        <div class="p-4">
+            <router-outlet />
+        </div>
     </main>
 
 </div>

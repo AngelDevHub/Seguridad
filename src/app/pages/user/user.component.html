@@ -1,110 +1,213 @@
-<div>
-    <div class="page-header">
-        <h1 class="page-title">Profile Data</h1>
-        <p class="page-subtitle">Datos del usuario registrado en el sistema.</p>
+<p-toast position="top-right" />
+<p-confirmDialog />
+
+<!-- ── Toolbar / Page Header ── -->
+@if (!isEditing()) {
+<p-toolbar styleClass="mb-4">
+    <ng-template #start>
+        <div class="flex flex-column gap-1">
+            <span class="text-2xl font-bold text-900">Profile Data</span>
+            <span class="text-500 text-sm">Datos del usuario registrado en el sistema.</span>
+        </div>
+    </ng-template>
+    <ng-template #end>
+        <div class="flex gap-2">
+            <p-button label="Editar" icon="pi pi-pencil" severity="secondary" (onClick)="startEdit()" />
+            <p-button label="Eliminar" icon="pi pi-trash" severity="danger" [outlined]="true"
+                (onClick)="confirmDelete()" />
+        </div>
+    </ng-template>
+</p-toolbar>
+}
+
+@if (profile(); as p) {
+
+@if (!isEditing()) {
+<!-- ── VIEW MODE ── -->
+<p-card styleClass="max-w-3xl">
+
+    <!-- Hero -->
+    <div class="flex align-items-center gap-3 mb-4">
+        <p-avatar [label]="avatarLabel()" size="xlarge" shape="circle" />
+        <div class="flex flex-column gap-1">
+            <span class="text-2xl font-bold text-900">{{ p.nombreCompleto }}</span>
+            <span class="text-500 text-sm">&#64;{{ p.usuario }}</span>
+            <p-tag [value]="p.rol" severity="info" [rounded]="true" />
+        </div>
     </div>
 
-    <p-card styleClass="profile-card">
-
-        <!-- Hero: Avatar + Nombre + Rol -->
-        <div class="profile-hero">
-            <p-avatar [label]="profile().nombreCompleto.charAt(0)" size="xlarge" shape="circle" />
-            <div>
-                <h2 class="profile-name">{{ profile().nombreCompleto }}</h2>
-                <p class="profile-username">@{{ profile().usuario }}</p>
-                <div class="hero-tags">
-                    <p-tag [value]="profile().rol" severity="info" [rounded]="true" />
+    <!-- Cuenta -->
+    <p-fieldset legend="Información de Cuenta" styleClass="mb-4">
+        <div class="grid">
+            <div class="col-12 md:col-6">
+                <div class="flex flex-column gap-1">
+                    <small class="text-500 font-semibold uppercase"
+                        style="font-size:0.65rem; letter-spacing:.08em">Usuario</small>
+                    <span class="text-900 font-medium"><i class="pi pi-at mr-2 text-primary"></i>{{ p.usuario }}</span>
+                </div>
+            </div>
+            <div class="col-12 md:col-6">
+                <div class="flex flex-column gap-1">
+                    <small class="text-500 font-semibold uppercase"
+                        style="font-size:0.65rem; letter-spacing:.08em">Correo</small>
+                    <span class="text-900 font-medium"><i class="pi pi-envelope mr-2 text-primary"></i>{{ p.email
+                        }}</span>
                 </div>
             </div>
         </div>
+    </p-fieldset>
 
-        <p-divider />
-
-        <!-- Sección: Información de Cuenta -->
-        <p class="section-title">Información de cuenta</p>
-        <div class="fields-grid">
-
-            <div class="field-group">
-                <p class="field-label">Usuario</p>
-                <div class="field-value">
-                    <i class="pi pi-at"></i>
-                    {{ profile().usuario }}
+    <!-- Personal -->
+    <p-fieldset legend="Información Personal" styleClass="mb-4">
+        <div class="grid">
+            <div class="col-12 md:col-6">
+                <div class="flex flex-column gap-1">
+                    <small class="text-500 font-semibold uppercase"
+                        style="font-size:0.65rem; letter-spacing:.08em">Nombre completo</small>
+                    <span class="text-900 font-medium"><i class="pi pi-user mr-2 text-primary"></i>{{ p.nombreCompleto
+                        }}</span>
                 </div>
             </div>
-
-            <div class="field-group">
-                <p class="field-label">Correo electrónico</p>
-                <div class="field-value">
-                    <i class="pi pi-envelope"></i>
-                    {{ profile().email }}
+            <div class="col-12 md:col-6">
+                <div class="flex flex-column gap-1">
+                    <small class="text-500 font-semibold uppercase"
+                        style="font-size:0.65rem; letter-spacing:.08em">Edad</small>
+                    <span class="text-900 font-medium"><i class="pi pi-calendar mr-2 text-primary"></i>{{ p.edad }}
+                        años</span>
                 </div>
             </div>
-
+            <div class="col-12 md:col-6 mt-3">
+                <div class="flex flex-column gap-1">
+                    <small class="text-500 font-semibold uppercase"
+                        style="font-size:0.65rem; letter-spacing:.08em">Teléfono</small>
+                    <span class="text-900 font-medium"><i class="pi pi-phone mr-2 text-primary"></i>{{ p.telefono
+                        }}</span>
+                </div>
+            </div>
+            <div class="col-12 md:col-6 mt-3">
+                <div class="flex flex-column gap-1">
+                    <small class="text-500 font-semibold uppercase"
+                        style="font-size:0.65rem; letter-spacing:.08em">Dirección</small>
+                    <span class="text-900 font-medium"><i class="pi pi-map-marker mr-2 text-primary"></i>{{ p.direccion
+                        }}</span>
+                </div>
+            </div>
         </div>
+    </p-fieldset>
 
-        <p-divider />
-
-        <!-- Sección: Información Personal -->
-        <p class="section-title">Información personal</p>
-        <div class="fields-grid">
-
-            <div class="field-group">
-                <p class="field-label">Nombre completo</p>
-                <div class="field-value">
-                    <i class="pi pi-user"></i>
-                    {{ profile().nombreCompleto }}
+    <!-- Sistema -->
+    <p-fieldset legend="Datos del Sistema">
+        <div class="grid">
+            <div class="col-12 md:col-6">
+                <div class="flex flex-column gap-1">
+                    <small class="text-500 font-semibold uppercase"
+                        style="font-size:0.65rem; letter-spacing:.08em">Rol</small>
+                    <span class="text-900 font-medium"><i class="pi pi-shield mr-2 text-primary"></i>{{ p.rol }}</span>
                 </div>
             </div>
-
-            <div class="field-group">
-                <p class="field-label">Edad</p>
-                <div class="field-value">
-                    <i class="pi pi-calendar"></i>
-                    {{ profile().edad }} años
+            <div class="col-12 md:col-6">
+                <div class="flex flex-column gap-1">
+                    <small class="text-500 font-semibold uppercase"
+                        style="font-size:0.65rem; letter-spacing:.08em">Miembro desde</small>
+                    <span class="text-900 font-medium"><i class="pi pi-clock mr-2 text-primary"></i>{{ p.fechaRegistro
+                        }}</span>
                 </div>
             </div>
-
-            <div class="field-group">
-                <p class="field-label">Teléfono</p>
-                <div class="field-value">
-                    <i class="pi pi-phone"></i>
-                    {{ profile().telefono }}
-                </div>
-            </div>
-
-            <div class="field-group">
-                <p class="field-label">Dirección</p>
-                <div class="field-value">
-                    <i class="pi pi-map-marker"></i>
-                    {{ profile().direccion }}
-                </div>
-            </div>
-
         </div>
+    </p-fieldset>
 
-        <p-divider />
+</p-card>
+}
 
-        <!-- Sección: Datos del sistema -->
-        <p class="section-title">Datos del sistema</p>
-        <div class="fields-grid">
-
-            <div class="field-group">
-                <p class="field-label">Rol</p>
-                <div class="field-value">
-                    <i class="pi pi-shield"></i>
-                    {{ profile().rol }}
-                </div>
-            </div>
-
-            <div class="field-group">
-                <p class="field-label">Miembro desde</p>
-                <div class="field-value">
-                    <i class="pi pi-clock"></i>
-                    {{ profile().fechaRegistro }}
-                </div>
-            </div>
-
+@if (isEditing()) {
+<!-- ── EDIT MODE ── -->
+<p-toolbar styleClass="mb-4">
+    <ng-template #start>
+        <span class="text-2xl font-bold text-900">Editar Perfil</span>
+    </ng-template>
+    <ng-template #end>
+        <div class="flex gap-2">
+            <p-button label="Cancelar" severity="secondary" [outlined]="true" (onClick)="cancelEdit()" />
+            <p-button label="Guardar cambios" icon="pi pi-check" [loading]="isSaving()" (onClick)="saveProfile()" />
         </div>
+    </ng-template>
+</p-toolbar>
 
-    </p-card>
-</div>
+<p-card styleClass="max-w-3xl">
+    <form [formGroup]="editForm">
+
+        <p-fieldset legend="Editar Cuenta" styleClass="mb-4">
+            <div class="grid">
+                <div class="col-12 md:col-6">
+                    <div class="flex flex-column gap-2">
+                        <label class="text-700 font-semibold text-sm">Usuario <span
+                                class="text-red-500">*</span></label>
+                        <input pInputText formControlName="usuario" class="w-full"
+                            (blur)="trimField('usuario',$event)" />
+                        @if (hasError('usuario','required')) { <small class="text-red-500">Requerido.</small> }
+                        @if (hasError('usuario','pattern')) { <small class="text-red-500">No puede ser solo
+                            espacios.</small> }
+                    </div>
+                </div>
+                <div class="col-12 md:col-6">
+                    <div class="flex flex-column gap-2">
+                        <label class="text-700 font-semibold text-sm">Correo electrónico <span
+                                class="text-red-500">*</span></label>
+                        <input pInputText formControlName="email" class="w-full" />
+                        @if (hasError('email','required')) { <small class="text-red-500">Requerido.</small> }
+                        @if (hasError('email','email')) { <small class="text-red-500">Formato inválido.</small> }
+                    </div>
+                </div>
+            </div>
+        </p-fieldset>
+
+        <p-fieldset legend="Editar Información Personal">
+            <div class="grid">
+                <div class="col-12 md:col-6">
+                    <div class="flex flex-column gap-2">
+                        <label class="text-700 font-semibold text-sm">Nombre completo <span
+                                class="text-red-500">*</span></label>
+                        <input pInputText formControlName="nombreCompleto" class="w-full" />
+                        @if (hasError('nombreCompleto','required')) { <small class="text-red-500">Requerido.</small> }
+                        @if (hasError('nombreCompleto','pattern')) { <small class="text-red-500">Solo letras y
+                            espacios.</small> }
+                    </div>
+                </div>
+                <div class="col-12 md:col-6">
+                    <div class="flex flex-column gap-2">
+                        <label class="text-700 font-semibold text-sm">Edad (mín. 18) <span
+                                class="text-red-500">*</span></label>
+                        <p-inputNumber formControlName="edad" [min]="18" [max]="120" [showButtons]="true"
+                            styleClass="w-full" />
+                        @if (hasError('edad','min')) { <small class="text-red-500">Mínimo 18 años.</small> }
+                    </div>
+                </div>
+                <div class="col-12 md:col-6 mt-3">
+                    <div class="flex flex-column gap-2">
+                        <label class="text-700 font-semibold text-sm">Teléfono (10 dígitos) <span
+                                class="text-red-500">*</span></label>
+                        <input pInputText formControlName="telefono" class="w-full" maxlength="10"
+                            (keypress)="onlyDigits($event)" (input)="limitDigits($event)" />
+                        @if (hasError('telefono','pattern')) { <small class="text-red-500">Debe ser 10 dígitos
+                            numéricos.</small> }
+                    </div>
+                </div>
+                <div class="col-12 md:col-6 mt-3">
+                    <div class="flex flex-column gap-2">
+                        <label class="text-700 font-semibold text-sm">Dirección <span
+                                class="text-red-500">*</span></label>
+                        <input pInputText formControlName="direccion" class="w-full"
+                            (blur)="trimField('direccion',$event)" />
+                        @if (hasError('direccion','required')) { <small class="text-red-500">Requerida.</small> }
+                        @if (hasError('direccion','pattern')) { <small class="text-red-500">No puede ser solo
+                            espacios.</small> }
+                    </div>
+                </div>
+            </div>
+        </p-fieldset>
+
+    </form>
+</p-card>
+}
+
+}

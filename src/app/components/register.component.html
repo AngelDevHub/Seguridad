@@ -5,10 +5,12 @@
 
             <div class="field mb-3">
                 <label>Usuario</label>
-                <input pInputText formControlName="usuario" class="w-full">
+                <input pInputText formControlName="usuario" class="w-full" (blur)="trimField('usuario', $event)">
                 <small class="text-red-500 block mt-1"
                     *ngIf="form.get('usuario')?.invalid && (form.get('usuario')?.dirty || form.get('usuario')?.touched)">
-                    El usuario es obligatorio.
+                    <span *ngIf="form.get('usuario')?.errors?.['required']">El usuario es obligatorio.</span>
+                    <span *ngIf="form.get('usuario')?.errors?.['pattern']">El usuario no puede contener solo
+                        espacios.</span>
                 </small>
             </div>
 
@@ -24,26 +26,32 @@
 
             <div class="field mb-3">
                 <label>Nombre Completo</label>
-                <input pInputText formControlName="nombreCompleto" class="w-full">
+                <input pInputText formControlName="nombreCompleto" class="w-full" (input)="onNameInput($event)">
                 <small class="text-red-500 block mt-1"
                     *ngIf="form.get('nombreCompleto')?.invalid && (form.get('nombreCompleto')?.dirty || form.get('nombreCompleto')?.touched)">
-                    El nombre completo es obligatorio.
+                    <span *ngIf="form.get('nombreCompleto')?.errors?.['required']">El nombre completo es
+                        obligatorio.</span>
+                    <span *ngIf="form.get('nombreCompleto')?.errors?.['pattern']">El nombre no puede contener números ni
+                        caracteres especiales.</span>
                 </small>
             </div>
 
             <div class="field mb-3">
                 <label>Dirección</label>
-                <input pInputText formControlName="direccion" class="w-full">
+                <input pInputText formControlName="direccion" class="w-full" (blur)="trimField('direccion', $event)">
                 <small class="text-red-500 block mt-1"
                     *ngIf="form.get('direccion')?.invalid && (form.get('direccion')?.dirty || form.get('direccion')?.touched)">
-                    La dirección es obligatoria.
+                    <span *ngIf="form.get('direccion')?.errors?.['required']">La dirección es obligatoria.</span>
+                    <span *ngIf="form.get('direccion')?.errors?.['pattern']">La dirección no puede contener solo
+                        espacios.</span>
                 </small>
             </div>
 
             <div class="flex gap-3 mb-3">
                 <div class="field w-full">
                     <label>Teléfono</label>
-                    <input pInputText formControlName="telefono" class="w-full">
+                    <input pInputText formControlName="telefono" class="w-full" type="tel" maxlength="10"
+                        placeholder="10 dígitos" (keypress)="onlyDigits($event)" (input)="limitDigits($event)">
                     <small class="text-red-500 block mt-1"
                         *ngIf="form.get('telefono')?.invalid && (form.get('telefono')?.dirty || form.get('telefono')?.touched)">
                         <span *ngIf="form.get('telefono')?.errors?.['required']">El teléfono es obligatorio.</span>
@@ -53,7 +61,8 @@
 
                 <div class="field w-full">
                     <label>Edad</label>
-                    <input pInputText type="number" formControlName="edad" class="w-full">
+                    <input pInputText type="number" formControlName="edad" class="w-full" step="1" min="18" max="120"
+                        (keypress)="onlyIntegers($event)">
                     <small class="text-red-500 block mt-1"
                         *ngIf="form.get('edad')?.invalid && (form.get('edad')?.dirty || form.get('edad')?.touched)">
                         <span *ngIf="form.get('edad')?.errors?.['required']">La edad es obligatoria.</span>
