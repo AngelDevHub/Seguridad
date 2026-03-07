@@ -35,6 +35,13 @@
             </small>
             }
 
+            <!-- Dashboard -->
+            <a routerLink="/dashboard" [style]="navStyle('dashboard', false)"
+                [pTooltip]="isCollapsed() ? 'Dashboard' : ''" tooltipPosition="right">
+                <i class="pi pi-home text-lg" style="min-width:20px; text-align:center"></i>
+                @if (!isCollapsed()) { <span>Dashboard</span> }
+            </a>
+
             <!-- Grupos -->
             <a routerLink="/group" [style]="navStyle('group', false)" [pTooltip]="isCollapsed() ? 'Grupos' : ''"
                 tooltipPosition="right">

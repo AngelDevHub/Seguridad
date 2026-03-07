@@ -1,0 +1,185 @@
+<p-toast position="top-right" />
+
+<p-dialog [header]="dialogHeader()" [visible]="visible()" (visibleChange)="visible.set($event)" [modal]="true"
+    [style]="{ width: '680px', 'max-height': '90vh' }" [draggable]="false" [maximizable]="true">
+
+    <!-- ══ VIEW MODE ══ -->
+    @if (mode() === 'view' && currentTicket(); as t) {
+    <div class="flex flex-column gap-3">
+
+        <!-- Header info -->
+        <div class="flex align-items-start justify-content-between gap-3">
+            <div class="flex flex-column gap-1">
+                <span class="text-2xl font-bold text-900">{{ t.titulo }}</span>
+                <span class="text-500 text-sm">Creado: {{ formatDate(t.fechaCreacion) }} · Asignado a <strong>{{
+                        t.asignadoA }}</strong></span>
+            </div>
+            <div class="flex gap-2 flex-shrink-0">
+                <p-tag [value]="t.estado" [severity]="statusSeverity(t.estado)" [rounded]="true" />
+                <p-tag [value]="t.prioridad" [severity]="prioritySeverity(t.prioridad)" [rounded]="true" />
+            </div>
+        </div>
+
+        <p-divider styleClass="my-1" />
+
+        <div>
+            <small class="text-500 font-semibold uppercase"
+                style="font-size:.65rem;letter-spacing:.08em">Descripción</small>
+            <p class="text-900 mt-1 line-height-3">{{ t.descripcion }}</p>
+        </div>
+
+        <div class="flex gap-4">
+            <div class="flex flex-column gap-1">
+                <small class="text-500 font-semibold uppercase" style="font-size:.65rem">Fecha límite</small>
+                <span class="text-900 font-medium">{{ formatDate(t.fechaLimite) }}</span>
+            </div>
+        </div>
+
+        <p-divider styleClass="my-1" />
+
+        <!-- Manual Tab Toggle -->
+        <div class="flex gap-1 border-bottom-1 surface-border pb-0">
+            <p-button label="Comentarios" icon="pi pi-comments" [text]="true"
+                [severity]="activeTab() === 'comentarios' ? 'primary' : 'secondary'"
+                (onClick)="activeTab.set('comentarios')" />
+            <p-button label="Historial" icon="pi pi-history" [text]="true"
+                [severity]="activeTab() === 'historial' ? 'primary' : 'secondary'"
+                (onClick)="activeTab.set('historial')" />
+        </div>
+
+        <!-- Comments Panel -->
+        @if (activeTab() === 'comentarios') {
+        <div class="flex flex-column gap-3 pt-2">
+            @for (c of t.comentarios; track c.id) {
+            <div class="surface-50 border-round p-3">
+                <div class="flex justify-content-between mb-1">
+                    <span class="font-semibold text-primary text-sm">{{ c.autor }}</span>
+                    <span class="text-500 text-xs">{{ formatDate(c.fecha) }}</span>
+                </div>
+                <p class="text-900 m-0 line-height-3">{{ c.texto }}</p>
+            </div>
+            }
+            @if (t.comentarios.length === 0) {
+            <p class="text-500 text-center py-3">Sin comentarios aún.</p>
+            }
+            <p-divider />
+            <div class="flex flex-column gap-2">
+                <label class="font-semibold text-700 text-sm">Agregar comentario</label>
+                <textarea pTextarea rows="3" class="w-full" [(ngModel)]="nuevoComentario"
+                    placeholder="Escribe tu comentario..."></textarea>
+                <div class="flex justify-content-end">
+                    <p-button label="Agregar" icon="pi pi-comment" size="small" (onClick)="addComment()"
+                        [disabled]="!nuevoComentario.trim()" />
+                </div>
+            </div>
+        </div>
+        }
+
+        <!-- History Panel -->
+        @if (activeTab() === 'historial') {
+        <div class="pt-2">
+            <p-timeline [value]="historialToTimeline(t.historialCambios)" layout="vertical">
+                <ng-template #content let-event>
+                    <div class="flex flex-column gap-1">
+                        <span class="text-900 font-medium text-sm">{{ event.status }}</span>
+                        <span class="text-500 text-xs">{{ event.date }} · por <strong>{{ event.usuario
+                                }}</strong></span>
+                    </div>
+                </ng-template>
+                <ng-template #marker let-event>
+                    <span class="flex align-items-center justify-content-center border-circle"
+                        [style]="{ width:'28px', height:'28px', background: event.color }">
+                        <i [class]="event.icon" style="font-size:0.7rem; color:white"></i>
+                    </span>
+                </ng-template>
+            </p-timeline>
+        </div>
+        }
+
+    </div>
+    }
+
+    <!-- ══ CREATE / EDIT MODE ══ -->
+    @if (isEditable()) {
+    <form [formGroup]="form" class="flex flex-column gap-4">
+
+        <div class="flex flex-column gap-2">
+            <label class="font-semibold text-700 text-sm">Título <span class="text-red-500">*</span></label>
+            <input pInputText formControlName="titulo" class="w-full" placeholder="Título del ticket" />
+            @if (hasError('titulo','required')) { <small class="text-red-500">Requerido.</small> }
+            @if (hasError('titulo','minlength')) { <small class="text-red-500">Mínimo 3 caracteres.</small> }
+        </div>
+
+        <div class="flex flex-column gap-2">
+            <label class="font-semibold text-700 text-sm">Descripción <span class="text-red-500">*</span></label>
+            <textarea pTextarea formControlName="descripcion" rows="3" class="w-full"
+                placeholder="Descripción detallada..."></textarea>
+            @if (hasError('descripcion','required')) { <small class="text-red-500">Requerida.</small> }
+        </div>
+
+        <div class="grid">
+            <div class="col-12 md:col-6">
+                <div class="flex flex-column gap-2">
+                    <label class="font-semibold text-700 text-sm">Estado <span class="text-red-500">*</span></label>
+                    <p-select formControlName="estado" [options]="estadoOptions" optionLabel="label" optionValue="value"
+                        styleClass="w-full" />
+                </div>
+            </div>
+            <div class="col-12 md:col-6">
+                <div class="flex flex-column gap-2">
+                    <label class="font-semibold text-700 text-sm">Prioridad <span class="text-red-500">*</span></label>
+                    <p-select formControlName="prioridad" [options]="prioridadOptions" optionLabel="label"
+                        optionValue="value" styleClass="w-full" />
+                </div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="col-12 md:col-6">
+                <div class="flex flex-column gap-2">
+                    <label class="font-semibold text-700 text-sm">Asignado a <span class="text-red-500">*</span></label>
+                    <input pInputText formControlName="asignadoA" class="w-full" placeholder="Email o nombre" />
+                    @if (hasError('asignadoA','required')) { <small class="text-red-500">Requerido.</small> }
+                </div>
+            </div>
+            <div class="col-12 md:col-6">
+                <div class="flex flex-column gap-2">
+                    <label class="font-semibold text-700 text-sm">Fecha límite <span
+                            class="text-red-500">*</span></label>
+                    <input type="date" pInputText formControlName="fechaLimite" class="w-full" />
+                    @if (hasError('fechaLimite','required')) { <small class="text-red-500">Requerida.</small> }
+                </div>
+            </div>
+        </div>
+
+        <!-- Fecha de creación — solo lectura en modo edición -->
+        @if (mode() === 'edit' && currentTicket()) {
+        <div class="flex flex-column gap-2">
+            <label class="font-semibold text-700 text-sm">
+                <i class="pi pi-lock text-500 mr-1"></i>Fecha de creación
+                <span class="text-500 font-normal ml-1" style="font-size:.75rem">(no editable)</span>
+            </label>
+            <div class="surface-50 border-1 surface-border border-round px-3 py-2 text-700 font-medium">
+                {{ formatDate(currentTicket()!.fechaCreacion) }}
+            </div>
+        </div>
+        }
+
+    </form>
+    }
+
+    <!-- ══ Footer ══ -->
+    <ng-template #footer>
+        <div class="flex justify-content-end gap-2 pt-2 border-top-1 surface-border mt-2">
+            @if (mode() === 'view') {
+            <p-button label="Cerrar" severity="secondary" [outlined]="true" (onClick)="close()" />
+            <p-button label="Editar" icon="pi pi-pencil" (onClick)="switchToEdit()" />
+            } @else {
+            <p-button label="Cancelar" severity="secondary" [outlined]="true" (onClick)="close()" />
+            <p-button [label]="mode() === 'create' ? 'Crear Ticket' : 'Guardar Cambios'" icon="pi pi-check"
+                (onClick)="save()" />
+            }
+        </div>
+    </ng-template>
+
+</p-dialog>
