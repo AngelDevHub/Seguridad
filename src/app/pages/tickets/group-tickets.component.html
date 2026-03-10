@@ -24,7 +24,8 @@
                 <p-button icon="pi pi-list" label="Lista" [severity]="viewMode() === 'lista' ? 'primary' : 'secondary'"
                     [outlined]="viewMode() !== 'lista'" (onClick)="viewMode.set('lista')" styleClass="border-noround" />
             </div>
-            <p-button label="Nuevo Ticket" icon="pi pi-plus" (onClick)="newTicket()" />
+            <p-button *ifHasPermission="'tickets:crear'" label="Nuevo Ticket" icon="pi pi-plus"
+                (onClick)="newTicket()" />
         </div>
     </ng-template>
 </p-toolbar>
@@ -68,10 +69,10 @@
                         }}</span>
                 </div>
                 <div class="flex gap-1" (click)="$event.stopPropagation()">
-                    <p-button icon="pi pi-pencil" [text]="true" severity="secondary" size="small"
-                        (onClick)="editTicket(t)" pTooltip="Editar" />
-                    <p-button icon="pi pi-trash" [text]="true" severity="danger" size="small"
-                        (onClick)="confirmDelete(t)" pTooltip="Eliminar" />
+                    <p-button *ifHasPermission="'tickets:editar'" icon="pi pi-pencil" [text]="true" severity="secondary"
+                        size="small" (onClick)="editTicket(t)" pTooltip="Editar" />
+                    <p-button *ifHasPermission="'tickets:eliminar'" icon="pi pi-trash" [text]="true" severity="danger"
+                        size="small" (onClick)="confirmDelete(t)" pTooltip="Eliminar" />
                 </div>
             </div>
         </div>
@@ -129,12 +130,12 @@
             <td>{{ formatDate(t.fechaLimite) }}</td>
             <td>
                 <div class="flex justify-content-center gap-1">
-                    <p-button icon="pi pi-eye" severity="info" [outlined]="true" size="small" (onClick)="viewTicket(t)"
-                        pTooltip="Ver" />
-                    <p-button icon="pi pi-pencil" severity="secondary" [outlined]="true" size="small"
-                        (onClick)="editTicket(t)" pTooltip="Editar" />
-                    <p-button icon="pi pi-trash" severity="danger" [outlined]="true" size="small"
-                        (onClick)="confirmDelete(t)" pTooltip="Eliminar" />
+                    <p-button *ifHasPermission="'tickets:ver'" icon="pi pi-eye" severity="info" [outlined]="true"
+                        size="small" (onClick)="viewTicket(t)" pTooltip="Ver" />
+                    <p-button *ifHasPermission="'tickets:editar'" icon="pi pi-pencil" severity="secondary"
+                        [outlined]="true" size="small" (onClick)="editTicket(t)" pTooltip="Editar" />
+                    <p-button *ifHasPermission="'tickets:eliminar'" icon="pi pi-trash" severity="danger"
+                        [outlined]="true" size="small" (onClick)="confirmDelete(t)" pTooltip="Eliminar" />
                 </div>
             </td>
         </tr>

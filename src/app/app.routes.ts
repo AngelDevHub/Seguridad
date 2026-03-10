@@ -44,6 +44,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./pages/user/user.component').then((m) => m.UserComponent),
       },
+      {
+        path: 'admin-users',
+        loadComponent: () =>
+          import('./pages/admin-users/admin-users.component').then((m) => m.AdminUsersComponent),
+      },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ],
   },

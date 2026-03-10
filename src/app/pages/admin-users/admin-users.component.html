@@ -1,0 +1,163 @@
+<p-toast position="top-right" />
+<p-confirmDialog />
+
+<!-- ── Toolbar ── -->
+<p-toolbar styleClass="mb-4">
+    <ng-template #start>
+        <div class="flex flex-column gap-1">
+            <span class="text-2xl font-bold text-900">Administración de Usuarios</span>
+            <span class="text-500 text-sm">Gestiona los usuarios y sus permisos del sistema.</span>
+        </div>
+    </ng-template>
+    <ng-template #end>
+        <p-button *ifHasPermission="'usuarios:crear'" label="Nuevo Usuario" icon="pi pi-user-plus"
+            (onClick)="openCreate()" />
+    </ng-template>
+</p-toolbar>
+
+<!-- ── Search ── -->
+<div class="flex justify-content-end mb-3">
+    <p-iconfield>
+        <p-inputicon styleClass="pi pi-search" />
+        <input pInputText placeholder="Buscar usuario..." (input)="onGlobalFilter($event, dt)" style="width:280px" />
+    </p-iconfield>
+</div>
+
+<!-- ── Table ── -->
+<p-table #dt [value]="users()" [paginator]="true" [rows]="10" [rowsPerPageOptions]="[5,10,20]"
+    [globalFilterFields]="['nombreCompleto','email']" sortMode="multiple"
+    styleClass="p-datatable-gridlines p-datatable-sm">
+    <ng-template #header>
+        <tr>
+            <th pSortableColumn="nombreCompleto">Nombre <p-sortIcon field="nombreCompleto" /></th>
+            <th pSortableColumn="email">Email <p-sortIcon field="email" /></th>
+            <th>Permisos</th>
+            <th style="width:100px; text-align:center">Estado</th>
+            <th style="width:185px; text-align:center">Acciones</th>
+        </tr>
+    </ng-template>
+
+    <ng-template #body let-u>
+        <tr>
+            <td><span class="font-semibold text-900">{{ u.nombreCompleto ?? '—' }}</span></td>
+            <td><span class="text-600">{{ u.email }}</span></td>
+            <td>
+                @if (u.permissions?.length) {
+                <div class="flex flex-wrap gap-1">
+                    @for (p of u.permissions.slice(0,3); track p) {
+                    <p-tag [value]="p" severity="info" [rounded]="true" style="font-size:.65rem" />
+                    }
+                    @if (u.permissions.length > 3) {
+                    <p-tag [value]="'+' + (u.permissions.length - 3) + ' más'" severity="secondary" [rounded]="true"
+                        style="font-size:.65rem" />
+                    }
+                </div>
+                } @else {
+                <span class="text-400 text-sm">Sin permisos</span>
+                }
+            </td>
+            <td class="text-center">
+                <p-tag [value]="u.active ? 'Activo' : 'Inactivo'" [severity]="u.active ? 'success' : 'danger'"
+                    [rounded]="true" />
+            </td>
+            <td>
+                <div class="flex justify-content-center gap-1">
+                    <p-button *ifHasPermission="'usuarios:asignarPermisos'" icon="pi pi-key" severity="warn"
+                        [outlined]="true" size="small" (onClick)="openPermissions(u)" pTooltip="Permisos"
+                        tooltipPosition="top" />
+                    <p-button *ifHasPermission="'usuarios:editar'" icon="pi pi-pencil" severity="secondary"
+                        [outlined]="true" size="small" (onClick)="openEdit(u)" pTooltip="Editar"
+                        tooltipPosition="top" />
+                    <p-button *ifHasPermission="'usuarios:editar'" [icon]="u.active ? 'pi pi-eye-slash' : 'pi pi-eye'"
+                        [severity]="u.active ? 'secondary' : 'success'" [outlined]="true" size="small"
+                        (onClick)="toggleActive(u)" [pTooltip]="u.active ? 'Desactivar' : 'Activar'"
+                        tooltipPosition="top" />
+                    <p-button *ifHasPermission="'usuarios:eliminar'" icon="pi pi-trash" severity="danger"
+                        [outlined]="true" size="small" (onClick)="confirmDelete(u)" pTooltip="Eliminar"
+                        tooltipPosition="top" />
+                </div>
+            </td>
+        </tr>
+    </ng-template>
+
+    <ng-template #emptymessage>
+        <tr>
+            <td colspan="5" class="text-center p-5 text-500">
+                <i class="pi pi-users text-4xl block mb-2"></i>
+                No hay usuarios registrados.
+            </td>
+        </tr>
+    </ng-template>
+</p-table>
+
+<!-- ══ Dialog: Crear / Editar Usuario ══ -->
+<p-dialog [header]="dialogMode() === 'create' ? 'Nuevo Usuario' : 'Editar Usuario'" [(visible)]="formDialogVisible"
+    [modal]="true" [style]="{ width: '520px' }" [draggable]="false">
+    <form [formGroup]="form" class="flex flex-column gap-4 pt-2">
+
+        <div class="flex flex-column gap-2">
+            <label class="font-semibold text-700 text-sm">Nombre completo <span class="text-red-500">*</span></label>
+            <input pInputText formControlName="nombreCompleto" class="w-full" placeholder="Ej: María García" />
+            @if (hasError('nombreCompleto','required')) { <small class="text-red-500">Requerido.</small> }
+            @if (hasError('nombreCompleto','minlength')) { <small class="text-red-500">Mínimo 2 caracteres.</small> }
+        </div>
+
+        <div class="flex flex-column gap-2">
+            <label class="font-semibold text-700 text-sm">Email <span class="text-red-500">*</span></label>
+            <input pInputText formControlName="email" class="w-full" placeholder="correo@ejemplo.com" />
+            @if (hasError('email','required')) { <small class="text-red-500">Requerido.</small> }
+            @if (hasError('email','email')) { <small class="text-red-500">Email inválido.</small> }
+        </div>
+
+        <div class="flex flex-column gap-2">
+            <label class="font-semibold text-700 text-sm">
+                Contraseña
+                @if (dialogMode() === 'edit') {
+                <span class="text-500 font-normal text-sm ml-1">(dejar vacío para no cambiar)</span>
+                } @else {
+                <span class="text-red-500">*</span>
+                }
+            </label>
+            <p-password formControlName="password" styleClass="w-full" [toggleMask]="true" [feedback]="false" />
+            @if (hasError('password','required')) { <small class="text-red-500">Requerida.</small> }
+            @if (hasError('password','minlength')) { <small class="text-red-500">Mínimo 6 caracteres.</small> }
+        </div>
+
+        <div class="flex flex-column gap-2">
+            <label class="font-semibold text-700 text-sm">Permisos iniciales</label>
+            <p-multiSelect formControlName="permissions" [options]="allPermissions" optionLabel="label"
+                optionValue="value" placeholder="Seleccionar permisos..." display="chip" styleClass="w-full"
+                [showClear]="true" [filter]="true" filterPlaceholder="Buscar permiso..." />
+        </div>
+
+    </form>
+
+    <ng-template #footer>
+        <div class="flex justify-content-end gap-2">
+            <p-button label="Cancelar" severity="secondary" [outlined]="true" (onClick)="closeDialog()" />
+            <p-button [label]="dialogMode() === 'create' ? 'Crear usuario' : 'Guardar cambios'" icon="pi pi-check"
+                [loading]="isSaving()" (onClick)="save()" />
+        </div>
+    </ng-template>
+</p-dialog>
+
+<!-- ══ Dialog: Asignar Permisos ══ -->
+<p-dialog header="Asignar Permisos al Usuario" [(visible)]="permsDialogVisible" [modal]="true"
+    [style]="{ width: '560px' }" [draggable]="false">
+    <form [formGroup]="permsForm" class="pt-2">
+        <div class="flex flex-column gap-2">
+            <label class="font-semibold text-700 text-sm">Permisos del usuario</label>
+            <p-multiSelect formControlName="permissions" [options]="allPermissions" optionLabel="label"
+                optionValue="value" placeholder="Seleccionar permisos..." display="chip" styleClass="w-full"
+                [filter]="true" filterPlaceholder="Buscar permiso..." [showClear]="true" />
+            <small class="text-500">El usuario tendrá exactamente los permisos seleccionados.</small>
+        </div>
+    </form>
+
+    <ng-template #footer>
+        <div class="flex justify-content-end gap-2">
+            <p-button label="Cancelar" severity="secondary" [outlined]="true" (onClick)="closeDialog()" />
+            <p-button label="Guardar permisos" icon="pi pi-key" (onClick)="savePermissions()" />
+        </div>
+    </ng-template>
+</p-dialog>

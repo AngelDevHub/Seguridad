@@ -16,8 +16,10 @@ import { ToolbarModule } from 'primeng/toolbar';
 import { ChipModule } from 'primeng/chip';
 import { DividerModule } from 'primeng/divider';
 import { CardModule } from 'primeng/card';
+import { TooltipModule } from 'primeng/tooltip';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { GroupCrudService, Group } from '../../core/services/group-crud.service';
+import { IfHasPermissionDirective } from '../../core/directives/if-has-permission.directive';
 
 type TagSeverity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast' | undefined;
 
@@ -28,7 +30,8 @@ type TagSeverity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contr
     ReactiveFormsModule, FormsModule,
     TableModule, ButtonModule, DialogModule, InputTextModule, InputNumberModule,
     SelectModule, ToastModule, ConfirmDialogModule, TagModule, IconFieldModule,
-    InputIconModule, ToolbarModule, ChipModule, DividerModule, CardModule,
+    InputIconModule, ToolbarModule, ChipModule, DividerModule, CardModule, TooltipModule,
+    IfHasPermissionDirective,
   ],
   templateUrl: './group.component.html',
 })

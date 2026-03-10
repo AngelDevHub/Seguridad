@@ -15,16 +15,12 @@ import { FieldsetModule } from 'primeng/fieldset';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { AuthService } from '../../core/services/auth.service';
 
-export interface UserProfile {
-  usuario: string;
-  nombreCompleto: string;
-  email: string;
-  telefono: string;
-  direccion: string;
-  edad: number;
-  rol: string;
-  fechaRegistro: string;
-}
+import { AppUser } from '../../core/services/auth.service';
+
+export type UserProfile = AppUser & {
+  rol?: string;
+  fechaRegistro?: string;
+};
 
 @Component({
   selector: 'app-user',
@@ -56,10 +52,17 @@ export class UserComponent implements OnInit {
   ngOnInit(): void {
     const user = this.authService.getCurrentUser();
     this.profile.set(user ?? {
-      usuario: 'angel.vanguardia', nombreCompleto: 'Ángel Vanguardia',
-      email: 'angel@miproyecto.dev', telefono: '5512345678',
-      direccion: 'Av. Reforma 123, CDMX', edad: 28,
-      rol: 'Administrador', fechaRegistro: 'Enero 2024',
+      email: 'usuario@demo.com',
+      password: '',
+      permissions: [],
+      active: true,
+      nombreCompleto: 'Usuario Demo',
+      usuario: 'demo',
+      telefono: '',
+      direccion: '',
+      edad: 0,
+      rol: 'Sin rol',
+      fechaRegistro: 'N/A',
     });
     this.buildForm();
   }

@@ -31,25 +31,32 @@
         <nav class="flex flex-column gap-1 px-2 flex-1">
             @if (!isCollapsed()) {
             <small class="text-500 font-semibold uppercase px-2 mb-1" style="font-size:0.65rem; letter-spacing:0.1em">
-                BOTONES RUTAS
+                NAVEGACIÓN
             </small>
             }
 
-            <!-- Dashboard -->
+            <!-- Dashboard — siempre visible -->
             <a routerLink="/dashboard" [style]="navStyle('dashboard', false)"
                 [pTooltip]="isCollapsed() ? 'Dashboard' : ''" tooltipPosition="right">
                 <i class="pi pi-home text-lg" style="min-width:20px; text-align:center"></i>
                 @if (!isCollapsed()) { <span>Dashboard</span> }
             </a>
 
-            <!-- Grupos -->
-            <a routerLink="/group" [style]="navStyle('group', false)" [pTooltip]="isCollapsed() ? 'Grupos' : ''"
-                tooltipPosition="right">
+            <!-- Grupos — requiere grupos:ver -->
+            <a *ifHasPermission="'grupos:ver'" routerLink="/group" [style]="navStyle('group', false)"
+                [pTooltip]="isCollapsed() ? 'Grupos' : ''" tooltipPosition="right">
                 <i class="pi pi-users text-lg" style="min-width:20px; text-align:center"></i>
                 @if (!isCollapsed()) { <span>Grupos</span> }
             </a>
 
-            <!-- Perfil -->
+            <!-- Administración de Usuarios — requiere usuarios:ver -->
+            <a *ifHasPermission="'usuarios:ver'" routerLink="/admin-users" [style]="navStyle('admin-users', false)"
+                [pTooltip]="isCollapsed() ? 'Admin Usuarios' : ''" tooltipPosition="right">
+                <i class="pi pi-shield text-lg" style="min-width:20px; text-align:center"></i>
+                @if (!isCollapsed()) { <span>Admin Usuarios</span> }
+            </a>
+
+            <!-- Perfil — siempre visible -->
             <a routerLink="/user" [style]="navStyle('user', false)" [pTooltip]="isCollapsed() ? 'Perfil' : ''"
                 tooltipPosition="right">
                 <i class="pi pi-user text-lg" style="min-width:20px; text-align:center"></i>
@@ -57,13 +64,13 @@
             </a>
         </nav>
 
-        <!-- Footer: versión -->
-        <div class="px-3 py-3 border-top-1 surface-border text-500"
-            style="font-size:0.75rem; white-space:nowrap; overflow:hidden">
+        <!-- Footer: logout + versión -->
+        <div class="px-2 py-3 border-top-1 surface-border flex flex-column gap-2">
+            <p-button icon="pi pi-sign-out" severity="danger" [text]="true"
+                [label]="isCollapsed() ? '' : 'Cerrar sesión'" [pTooltip]="isCollapsed() ? 'Cerrar sesión' : ''"
+                tooltipPosition="right" (onClick)="logout()" styleClass="w-full justify-content-start" />
             @if (!isCollapsed()) {
-            <span>App {{ appVersion() }}</span>
-            } @else {
-            <i class="pi pi-info-circle"></i>
+            <span class="text-500 px-2" style="font-size:0.75rem">App {{ appVersion() }}</span>
             }
         </div>
 

@@ -17,6 +17,7 @@ import { GroupCrudService, Group } from '../../core/services/group-crud.service'
 import { TicketService } from '../../core/services/ticket.service';
 import { Ticket, TicketStatus, TicketPriority } from '../../core/models/ticket.model';
 import { TicketDialogComponent } from './ticket-dialog.component';
+import { IfHasPermissionDirective } from '../../core/directives/if-has-permission.directive';
 
 type Severity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast' | undefined;
 
@@ -27,7 +28,7 @@ type Severity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast
     RouterLink, FormsModule,
     TableModule, ButtonModule, TagModule, SelectModule, ToastModule, ConfirmDialogModule,
     ToolbarModule, IconFieldModule, InputIconModule, InputTextModule, TooltipModule,
-    TicketDialogComponent,
+    TicketDialogComponent, IfHasPermissionDirective,
   ],
   templateUrl: './group-tickets.component.html',
 })

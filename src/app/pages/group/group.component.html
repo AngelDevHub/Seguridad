@@ -10,7 +10,7 @@
         </div>
     </ng-template>
     <ng-template #end>
-        <p-button label="Nuevo Grupo" icon="pi pi-plus" (onClick)="openNewDialog()" />
+        <p-button *ifHasPermission="'grupos:crear'" label="Nuevo Grupo" icon="pi pi-plus" (onClick)="openNewDialog()" />
     </ng-template>
 </p-toolbar>
 
@@ -51,12 +51,14 @@
             <td class="text-center">{{ group.tickets }}</td>
             <td>
                 <div class="flex justify-content-center gap-1">
-                    <p-button icon="pi pi-ticket" severity="info" [outlined]="true" size="small"
-                        (onClick)="viewTickets(group)" pTooltip="Ver Tickets" tooltipPosition="top" />
-                    <p-button icon="pi pi-pencil" severity="secondary" [outlined]="true" size="small"
-                        (onClick)="openEditDialog(group)" pTooltip="Editar" tooltipPosition="top" />
-                    <p-button icon="pi pi-trash" severity="danger" [outlined]="true" size="small"
-                        (onClick)="confirmDelete(group)" pTooltip="Eliminar" tooltipPosition="top" />
+                    <p-button *ifHasPermission="'tickets:ver'" icon="pi pi-ticket" severity="info" [outlined]="true"
+                        size="small" (onClick)="viewTickets(group)" pTooltip="Ver Tickets" tooltipPosition="top" />
+                    <p-button *ifHasPermission="'grupos:editar'" icon="pi pi-pencil" severity="secondary"
+                        [outlined]="true" size="small" (onClick)="openEditDialog(group)" pTooltip="Editar"
+                        tooltipPosition="top" />
+                    <p-button *ifHasPermission="'grupos:eliminar'" icon="pi pi-trash" severity="danger"
+                        [outlined]="true" size="small" (onClick)="confirmDelete(group)" pTooltip="Eliminar"
+                        tooltipPosition="top" />
                 </div>
             </td>
         </tr>
@@ -94,8 +96,8 @@
     <div class="flex gap-2 align-items-center mb-4">
         <input pInputText [(ngModel)]="newMemberInput" class="flex-1" placeholder="Email o usuario del nuevo miembro"
             (keyup.enter)="addMember()" />
-        <p-button label="Agregar" icon="pi pi-plus" [outlined]="true" (onClick)="addMember()"
-            [disabled]="!newMemberInput.trim()" />
+        <p-button *ifHasPermission="'grupos:invitar'" label="Agregar" icon="pi pi-plus" [outlined]="true"
+            (onClick)="addMember()" [disabled]="!newMemberInput.trim()" />
     </div>
 
     <!-- Members list -->
