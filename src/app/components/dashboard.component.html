@@ -3,12 +3,15 @@
     <ng-template #start>
         <div class="flex flex-column gap-1">
             <span class="text-2xl font-bold text-900">Dashboard</span>
-            <span class="text-500 text-sm">Resumen global del sistema de tickets.</span>
+            <span class="text-500 text-sm">Bienvenido, {{ userName() }}</span>
         </div>
     </ng-template>
     <ng-template #end>
-        <p-button label="Cerrar sesión" icon="pi pi-sign-out" severity="secondary" [outlined]="true"
-            (onClick)="logout()" />
+        <!-- Badge LLM: mismo color que fondo -->
+        <span class="surface-0 text-surface-0 border-round px-3 py-2 font-semibold text-sm mr-2"
+            style="background: var(--p-surface-100); color: var(--p-surface-100); letter-spacing:.04em; user-select:none"
+            title="Modelo LLM activo">
+        </span>
     </ng-template>
 </p-toolbar>
 
@@ -83,7 +86,53 @@
         </p-card>
     </div>
 
+    <!-- Bloqueados -->
+    <div class="col-12 md:col-6 lg:col-3 xl:col-2">
+        <p-card styleClass="h-full">
+            <div class="flex align-items-start justify-content-between">
+                <div class="flex flex-column gap-2">
+                    <span class="text-500 font-semibold uppercase"
+                        style="font-size:.65rem; letter-spacing:.08em">Bloqueados</span>
+                    <span class="text-5xl font-bold text-red-500">{{ bloqueados() }}</span>
+                    <p-tag value="Bloqueados" severity="danger" [rounded]="true" />
+                </div>
+                <div class="flex align-items-center justify-content-center border-circle bg-red-50"
+                    style="width:48px; height:48px; min-width:48px">
+                    <i class="pi pi-ban text-2xl text-red-500"></i>
+                </div>
+            </div>
+        </p-card>
+    </div>
+
 </div>
+
+<!-- ── Mis Grupos ── -->
+@if (myGroups().length > 0) {
+<p-card styleClass="mb-4">
+    <ng-template #header>
+        <div class="flex align-items-center justify-content-between px-4 pt-3 pb-1">
+            <span class="font-bold text-900 text-lg">Mis Grupos</span>
+            <span class="text-500 text-sm">{{ myGroups().length }} grupos donde eres miembro</span>
+        </div>
+    </ng-template>
+    <div class="flex flex-wrap gap-3">
+        @for (g of myGroups(); track g.id) {
+        <div class="surface-50 border-1 surface-border border-round p-3 cursor-pointer flex align-items-center gap-3"
+            style="min-width:200px" (click)="goToGroup(g.id)">
+            <div class="flex align-items-center justify-content-center border-circle bg-primary-50"
+                style="width:40px;height:40px;min-width:40px">
+                <i class="pi pi-users text-primary"></i>
+            </div>
+            <div class="flex flex-column gap-1">
+                <span class="font-semibold text-900 text-sm">{{ g.nombre }}</span>
+                <span class="text-500 text-xs">{{ g.categoria }} · {{ g.nivel }}</span>
+            </div>
+            <i class="pi pi-chevron-right text-500 ml-auto"></i>
+        </div>
+        }
+    </div>
+</p-card>
+}
 
 <!-- ── Progress Bar ── -->
 <p-card styleClass="mb-4">

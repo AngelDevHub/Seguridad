@@ -1,5 +1,6 @@
 import { Component, inject, signal, computed, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
@@ -15,9 +16,11 @@ import { FormsModule } from '@angular/forms';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { GroupCrudService, Group } from '../../core/services/group-crud.service';
 import { TicketService } from '../../core/services/ticket.service';
+import { AuthService } from '../../core/services/auth.service';
 import { Ticket, TicketStatus, TicketPriority } from '../../core/models/ticket.model';
 import { TicketDialogComponent } from './ticket-dialog.component';
 import { IfHasPermissionDirective } from '../../core/directives/if-has-permission.directive';
+import { QuickFiltersComponent } from '../../components/quick-filters.component';
 
 type Severity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast' | undefined;
 
@@ -25,10 +28,10 @@ type Severity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast
   selector: 'app-group-tickets',
   standalone: true,
   imports: [
-    RouterLink, FormsModule,
+    RouterLink, FormsModule, DragDropModule,
     TableModule, ButtonModule, TagModule, SelectModule, ToastModule, ConfirmDialogModule,
     ToolbarModule, IconFieldModule, InputIconModule, InputTextModule, TooltipModule,
-    TicketDialogComponent, IfHasPermissionDirective,
+    TicketDialogComponent, IfHasPermissionDirective, QuickFiltersComponent,
   ],
   templateUrl: './group-tickets.component.html',
 })
@@ -37,18 +40,24 @@ export class GroupTicketsComponent implements OnInit {
   private readonly router         = inject(Router);
   private readonly groupService   = inject(GroupCrudService);
   private readonly ticketService  = inject(TicketService);
+  private readonly authService    = inject(AuthService);
   private readonly messageService = inject(MessageService);
   private readonly confirmService = inject(ConfirmationService);
 
   @ViewChild('ticketDialog') ticketDialog!: TicketDialogComponent;
+  @ViewChild('quickFilters') quickFilters!: QuickFiltersComponent;
 
-  groupId = signal('');
-  group   = signal<Group | null>(null);
+  groupId  = signal('');
+  group    = signal<Group | null>(null);
   viewMode = signal<'kanban' | 'lista'>('kanban');
 
   // Filters (list view)
   filterEstado    = signal<string>('');
   filterPrioridad = signal<string>('');
+
+  readonly currentUserEmail = computed(() =>
+    this.authService.getCurrentUser()?.email ?? ''
+  );
 
   readonly tickets = computed(() => {
     const id = this.groupId();
@@ -62,14 +71,18 @@ export class GroupTicketsComponent implements OnInit {
     return t;
   });
 
-  readonly columnsKanban: { status: TicketStatus; label: string; color: string }[] = [
-    { status: 'Pendiente',    label: 'Pendiente',   color: '#6b7280' },
-    { status: 'En progreso',  label: 'En Progreso', color: '#3b82f6' },
-    { status: 'Revisión',     label: 'Revisión',    color: '#f59e0b' },
-    { status: 'Finalizado',   label: 'Finalizado',  color: '#22c55e' },
+  readonly columnsKanban: { status: TicketStatus; label: string; color: string; connectedTo: string }[] = [
+    { status: 'Pendiente',   label: 'Pendiente',   color: '#6b7280', connectedTo: 'Pendiente' },
+    { status: 'En progreso', label: 'En Progreso', color: '#3b82f6', connectedTo: 'En progreso' },
+    { status: 'Revisión',    label: 'Revisión',    color: '#f59e0b', connectedTo: 'Revisión' },
+    { status: 'Finalizado',  label: 'Finalizado',  color: '#22c55e', connectedTo: 'Finalizado' },
+    { status: 'Bloqueado',   label: 'Bloqueado',   color: '#ef4444', connectedTo: 'Bloqueado' },
   ];
 
-  estadoOptions    = [ { label: 'Todos', value: '' }, { label: 'Pendiente', value: 'Pendiente' }, { label: 'En progreso', value: 'En progreso' }, { label: 'Revisión', value: 'Revisión' }, { label: 'Finalizado', value: 'Finalizado' }];
+  /** IDs de los drop lists para conectarlos entre sí */
+  readonly dropListIds = this.columnsKanban.map(c => 'col-' + c.status.replace(/\s/g, '-'));
+
+  estadoOptions    = [ { label: 'Todos', value: '' }, { label: 'Pendiente', value: 'Pendiente' }, { label: 'En progreso', value: 'En progreso' }, { label: 'Revisión', value: 'Revisión' }, { label: 'Finalizado', value: 'Finalizado' }, { label: 'Bloqueado', value: 'Bloqueado' }];
   prioridadOptions = [ { label: 'Todas', value: '' }, { label: 'Baja', value: 'Baja' }, { label: 'Media', value: 'Media' }, { label: 'Alta', value: 'Alta' }, { label: 'Crítica', value: 'Crítica' } ];
 
   ngOnInit(): void {
@@ -80,7 +93,22 @@ export class GroupTicketsComponent implements OnInit {
   }
 
   ticketsByStatus(status: TicketStatus): Ticket[] {
-    return this.tickets().filter(t => t.estado === status);
+    const base = this.tickets().filter(t => t.estado === status);
+    // Aplica filtro rápido si hay uno activo
+    return this.quickFilters ? this.quickFilters.applyTo(base) : base;
+  }
+
+  /** CDK Drag & Drop — mover ticket a otra columna */
+  onTicketDrop(event: CdkDragDrop<Ticket[]>, targetStatus: TicketStatus): void {
+    if (event.previousContainer === event.container) {
+      moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
+    } else {
+      const ticket: Ticket = event.previousContainer.data[event.previousIndex];
+      transferArrayItem(event.previousContainer.data, event.container.data, event.previousIndex, event.currentIndex);
+      const usuario = this.currentUserEmail();
+      this.ticketService.changeStatus(ticket.id, targetStatus, usuario);
+      this.messageService.add({ severity: 'info', summary: `Estado → ${targetStatus}`, detail: ticket.titulo, life: 2500 });
+    }
   }
 
   newTicket():             void { this.ticketDialog.open(null,   'create', this.groupId()); }
@@ -102,21 +130,17 @@ export class GroupTicketsComponent implements OnInit {
   }
 
   statusSeverity(s: TicketStatus): Severity {
-    return ({ 'Pendiente': 'secondary', 'En progreso': 'info', 'Revisión': 'warn', 'Finalizado': 'success' } as any)[s];
+    return ({ 'Pendiente': 'secondary', 'En progreso': 'info', 'Revisión': 'warn', 'Finalizado': 'success', 'Bloqueado': 'danger' } as any)[s];
   }
-
   prioritySeverity(p: TicketPriority): Severity {
     return ({ 'Baja': 'success', 'Media': 'info', 'Alta': 'warn', 'Crítica': 'danger' } as any)[p];
   }
-
   formatDate(iso: string): string {
     return new Date(iso).toLocaleDateString('es-MX');
   }
-
   onGlobalFilter(e: Event, dt: any): void {
     dt.filterGlobal((e.target as HTMLInputElement).value, 'contains');
   }
-
   clearFilters(): void {
     this.filterEstado.set('');
     this.filterPrioridad.set('');

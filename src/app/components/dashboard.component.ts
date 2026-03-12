@@ -7,6 +7,7 @@ import { TableModule } from 'primeng/table';
 import { ToolbarModule } from 'primeng/toolbar';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { DividerModule } from 'primeng/divider';
+import { ChipModule } from 'primeng/chip';
 import { MessageService } from 'primeng/api';
 import { TicketService } from '../core/services/ticket.service';
 import { GroupCrudService } from '../core/services/group-crud.service';
@@ -18,7 +19,7 @@ type Severity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CardModule, ButtonModule, TagModule, TableModule, ToolbarModule, ProgressBarModule, DividerModule],
+  imports: [CardModule, ButtonModule, TagModule, TableModule, ToolbarModule, ProgressBarModule, DividerModule, ChipModule],
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent {
@@ -31,7 +32,9 @@ export class DashboardComponent {
   readonly enProgreso  = this.ticketService.totalEnProgreso;
   readonly revision    = this.ticketService.totalRevision;
   readonly finalizados = this.ticketService.totalFinalizados;
+  readonly bloqueados  = this.ticketService.totalBloqueados;
   readonly total       = this.ticketService.total;
+  readonly llmModel    = 'GPT-4o';
 
   readonly completionPct = computed(() =>
     this.total() === 0 ? 0 : Math.round((this.finalizados() / this.total()) * 100)
@@ -42,6 +45,18 @@ export class DashboardComponent {
   readonly userName = computed(() =>
     this.authService.getCurrentUser()?.nombreCompleto ?? 'Usuario'
   );
+
+  readonly currentEmail = computed(() =>
+    this.authService.getCurrentUser()?.email ?? ''
+  );
+
+  /** Grupos donde el usuario actual es miembro */
+  readonly myGroups = computed(() => {
+    const email = this.currentEmail();
+    return this.groupService.groups().filter((g) =>
+      g.miembrosList?.some((m: string) => m === email) || g.autor === email
+    );
+  });
 
   statusSeverity(s: TicketStatus): Severity {
     return ({ 'Pendiente': 'secondary', 'En progreso': 'info', 'Revisión': 'warn', 'Finalizado': 'success' } as any)[s];

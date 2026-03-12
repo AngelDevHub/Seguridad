@@ -71,10 +71,10 @@
                     <p-button *ifHasPermission="'usuarios:editar'" [icon]="u.active ? 'pi pi-eye-slash' : 'pi pi-eye'"
                         [severity]="u.active ? 'secondary' : 'success'" [outlined]="true" size="small"
                         (onClick)="toggleActive(u)" [pTooltip]="u.active ? 'Desactivar' : 'Activar'"
-                        tooltipPosition="top" />
+                        tooltipPosition="top" [disabled]="u.isProtected" />
                     <p-button *ifHasPermission="'usuarios:eliminar'" icon="pi pi-trash" severity="danger"
                         [outlined]="true" size="small" (onClick)="confirmDelete(u)" pTooltip="Eliminar"
-                        tooltipPosition="top" />
+                        tooltipPosition="top" [disabled]="u.isProtected" />
                 </div>
             </td>
         </tr>

@@ -101,6 +101,21 @@
 
     <!-- ══ CREATE / EDIT MODE ══ -->
     @if (isEditable()) {
+    <!-- Banner de rol -->
+    @if (mode() === 'edit') {
+    <div class="border-round p-3 mb-2"
+        [class]="canChangeStatusOnly() ? 'bg-yellow-50 border-1 border-yellow-300' : 'bg-blue-50 border-1 border-blue-300'">
+        <span class="text-sm font-medium">
+            @if (canChangeStatusOnly()) {
+            <i class="pi pi-exclamation-triangle text-yellow-600 mr-1"></i>
+            <span class="text-yellow-700">Eres el asignado — solo puedes cambiar el estado y agregar comentarios.</span>
+            } @else {
+            <i class="pi pi-user-edit text-blue-600 mr-1"></i>
+            <span class="text-blue-700">Eres el creador — puedes editar todos los campos.</span>
+            }
+        </span>
+    </div>
+    }
     <form [formGroup]="form" class="flex flex-column gap-4">
 
         <div class="flex flex-column gap-2">

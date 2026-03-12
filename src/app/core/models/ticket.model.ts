@@ -1,4 +1,4 @@
-export type TicketStatus   = 'Pendiente' | 'En progreso' | 'Revisión' | 'Finalizado';
+export type TicketStatus   = 'Pendiente' | 'En progreso' | 'Revisión' | 'Finalizado' | 'Bloqueado';
 export type TicketPriority = 'Baja' | 'Media' | 'Alta' | 'Crítica';
 
 export interface TicketComment {
@@ -27,6 +27,8 @@ export interface Ticket {
   fechaCreacion: string; // ISO string
   fechaLimite: string;   // ISO string
   groupId: string;
+  /** Email del usuario que creó el ticket */
+  creadoPor: string;
   comentarios: TicketComment[];
   historialCambios: HistorialCambio[];
 }

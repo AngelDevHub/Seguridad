@@ -6,14 +6,8 @@ const STORAGE_KEY = 'tickets';
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
-
-function now(): string {
-  return new Date().toISOString();
-}
-
-function futureDate(days: number): string {
-  return new Date(Date.now() + days * 86_400_000).toISOString();
-}
+function now(): string { return new Date().toISOString(); }
+function futureDate(days: number): string { return new Date(Date.now() + days * 86_400_000).toISOString(); }
 
 @Injectable({ providedIn: 'root' })
 export class TicketService {
@@ -25,6 +19,7 @@ export class TicketService {
   readonly totalEnProgreso  = computed(() => this._tickets().filter(t => t.estado === 'En progreso').length);
   readonly totalRevision    = computed(() => this._tickets().filter(t => t.estado === 'Revisión').length);
   readonly totalFinalizados = computed(() => this._tickets().filter(t => t.estado === 'Finalizado').length);
+  readonly totalBloqueados  = computed(() => this._tickets().filter(t => t.estado === 'Bloqueado').length);
   readonly total            = computed(() => this._tickets().length);
 
   // ── Load / Seed ────────────────────────────────────────────────
@@ -33,12 +28,13 @@ export class TicketService {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed: Ticket[] = JSON.parse(raw);
-        if (parsed.length > 0 && parsed[0].historialCambios !== undefined) return parsed;
+        if (parsed.length > 0 && parsed[0].historialCambios !== undefined) {
+          // Migración: agregar creadoPor si falta en tickets existentes
+          return parsed.map(t => ({ ...t, creadoPor: t.creadoPor ?? 'admin@test.com' }));
+        }
       }
       return this.seedData();
-    } catch {
-      return this.seedData();
-    }
+    } catch { return this.seedData(); }
   }
 
   private seedData(): Ticket[] {
@@ -47,13 +43,14 @@ export class TicketService {
       const groups: any[] = groupsRaw ? JSON.parse(groupsRaw) : [];
       if (groups.length === 0) return [];
 
-      const estados: TicketStatus[] = ['Pendiente', 'En progreso', 'Revisión', 'Finalizado'];
-      const prioridades             = ['Alta', 'Media', 'Baja', 'Crítica'] as const;
+      const estados: TicketStatus[] = ['Pendiente', 'En progreso', 'Revisión', 'Finalizado', 'Bloqueado'];
+      const prioridades             = ['Alta', 'Media', 'Baja', 'Crítica', 'Media'] as const;
       const titulos = [
         'Diseñar pantalla principal',
         'Corregir bug de autenticación',
         'Documentar endpoints de API',
         'Revisar métricas del servidor',
+        'Migrar base de datos',
       ];
       const tickets: Ticket[] = [];
 
@@ -65,8 +62,10 @@ export class TicketService {
           }];
           tickets.push({
             id: generateId(), groupId: g.id,
-            titulo: titulos[i], descripcion: `Descripción detallada del ticket ${i + 1} en el grupo "${g.nombre}".`,
+            titulo: titulos[i],
+            descripcion: `Descripción detallada del ticket ${i + 1} en el grupo "${g.nombre}".`,
             estado, asignadoA: g.autor ?? 'Sin asignar',
+            creadoPor: 'admin@test.com',
             prioridad: prioridades[i],
             fechaCreacion: now(), fechaLimite: futureDate((i + 1) * 5),
             comentarios: [], historialCambios: historial,
@@ -76,9 +75,7 @@ export class TicketService {
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets));
       return tickets;
-    } catch {
-      return [];
-    }
+    } catch { return []; }
   }
 
   private persist(tickets: Ticket[]): void {
@@ -90,19 +87,19 @@ export class TicketService {
   byGroup(groupId: string): Ticket[] {
     return this._tickets().filter(t => t.groupId === groupId);
   }
-
   byGroupAndStatus(groupId: string, status: TicketStatus): Ticket[] {
     return this._tickets().filter(t => t.groupId === groupId && t.estado === status);
   }
-
   getById(id: string): Ticket | undefined {
     return this._tickets().find(t => t.id === id);
   }
-
   recentAll(limit = 10): Ticket[] {
     return [...this._tickets()]
       .sort((a, b) => b.fechaCreacion.localeCompare(a.fechaCreacion))
       .slice(0, limit);
+  }
+  byUser(email: string): Ticket[] {
+    return this._tickets().filter(t => t.asignadoA === email);
   }
 
   // ── CRUD ──────────────────────────────────────────────────────
@@ -123,10 +120,8 @@ export class TicketService {
     const list  = this._tickets();
     const idx   = list.findIndex(t => t.id === id);
     if (idx === -1) return false;
-
     const old = list[idx];
     const historial = [...old.historialCambios];
-
     (Object.keys(changes) as (keyof typeof changes)[]).forEach(key => {
       const oldVal = String(old[key] ?? '');
       const newVal = String(changes[key] ?? '');
@@ -134,7 +129,6 @@ export class TicketService {
         historial.push({ id: generateId(), campo: key, valorAnterior: oldVal, valorNuevo: newVal, fecha: now(), usuario });
       }
     });
-
     const updated = list.map((t, i) => i === idx ? { ...t, ...changes, historialCambios: historial } : t);
     this.persist(updated);
     return true;

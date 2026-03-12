@@ -117,9 +117,70 @@
     </p-fieldset>
 
 </p-card>
+} <!-- cierra @if (!isEditing()) -->
+
+<!-- ── Mis Tickets ── -->
+@if (myTickets().length > 0 || true) {
+<p-card styleClass="mt-4 max-w-6xl">
+    <ng-template #header>
+        <div class="flex align-items-center justify-content-between px-4 pt-3 pb-1">
+            <span class="font-bold text-900 text-lg">Mis Tickets</span>
+            <span class="text-500 text-sm">{{ myTickets().length }} tickets asignados a ti</span>
+        </div>
+    </ng-template>
+
+    <!-- KPIs -->
+    <div class="grid mb-4">
+        <div class="col-4">
+            <div class="surface-50 border-round p-3 text-center border-1 surface-border">
+                <div class="text-3xl font-bold text-500">{{ myTicketsOpen() }}</div>
+                <small class="text-500">Abiertos / Bloqueados</small>
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="surface-50 border-round p-3 text-center border-1 surface-border">
+                <div class="text-3xl font-bold text-blue-500">{{ myTicketsProgress() }}</div>
+                <small class="text-500">En Progreso / Revisión</small>
+            </div>
+        </div>
+        <div class="col-4">
+            <div class="surface-50 border-round p-3 text-center border-1 surface-border">
+                <div class="text-3xl font-bold text-green-500">{{ myTicketsDone() }}</div>
+                <small class="text-500">Completados</small>
+            </div>
+        </div>
+    </div>
+
+    @if (myTickets().length > 0) {
+    <p-table [value]="myTickets()" styleClass="p-datatable-sm p-datatable-gridlines" [rows]="5" [paginator]="true">
+        <ng-template #header>
+            <tr>
+                <th style="width:130px">Estado</th>
+                <th>Título</th>
+                <th style="width:110px">Prioridad</th>
+                <th style="width:120px">Fecha límite</th>
+            </tr>
+        </ng-template>
+        <ng-template #body let-t>
+            <tr>
+                <td><p-tag [value]="t.estado" [rounded]="true" /></td>
+                <td><span class="font-semibold text-900">{{ t.titulo }}</span></td>
+                <td><p-tag [value]="t.prioridad" [rounded]="true" /></td>
+                <td>{{ t.fechaLimite.slice(0,10) }}</td>
+            </tr>
+        </ng-template>
+    </p-table>
+    } @else {
+    <div class="text-center text-500 py-4">
+        <i class="pi pi-ticket text-3xl block mb-2"></i>
+        No tienes tickets asignados actualmente.
+    </div>
+    }
+</p-card>
 }
 
 @if (isEditing()) {
+
 <!-- ── EDIT MODE ── -->
 <p-toolbar styleClass="mb-4">
     <ng-template #start>

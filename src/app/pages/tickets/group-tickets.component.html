@@ -30,9 +30,14 @@
     </ng-template>
 </p-toolbar>
 
+<!-- ── Filtros Rápidos ── -->
+<div class="mb-3 p-3 surface-50 border-1 surface-border border-round">
+    <app-quick-filters #quickFilters />
+</div>
+
 <!-- ══════ KANBAN VIEW ══════ -->
 @if (viewMode() === 'kanban') {
-<div class="flex gap-3 overflow-x-auto pb-3">
+<div class="flex gap-3 overflow-x-auto pb-3" cdkDropListGroup>
     @for (col of columnsKanban; track col.status) {
     <div class="flex flex-column gap-2 flex-none border-1 surface-border border-round p-3 surface-50"
         style="width:280px; min-width:280px">
@@ -49,38 +54,53 @@
             </span>
         </div>
 
-        <!-- Ticket cards -->
-        @for (t of ticketsByStatus(col.status); track t.id) {
-        <div class="surface-0 border-1 surface-border border-round p-3 cursor-pointer"
-            style="transition: box-shadow .15s ease" (click)="viewTicket(t)">
-            <div class="flex flex-column gap-2">
-                <div class="flex align-items-start justify-content-between gap-2">
-                    <span class="font-semibold text-900 line-height-2" style="font-size:.875rem">{{ t.titulo }}</span>
-                    <p-tag [value]="t.prioridad" [severity]="prioritySeverity(t.prioridad)" [rounded]="true"
-                        style="white-space:nowrap; font-size:.65rem" />
-                </div>
-                <p class="text-500 text-xs m-0 line-height-2"
-                    style="display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">
-                    {{ t.descripcion }}
-                </p>
-                <div class="flex align-items-center justify-content-between mt-1">
-                    <span class="text-500 text-xs"><i class="pi pi-user mr-1"></i>{{ t.asignadoA }}</span>
-                    <span class="text-500 text-xs"><i class="pi pi-calendar mr-1"></i>{{ formatDate(t.fechaLimite)
-                        }}</span>
-                </div>
-                <div class="flex gap-1" (click)="$event.stopPropagation()">
-                    <p-button *ifHasPermission="'tickets:editar'" icon="pi pi-pencil" [text]="true" severity="secondary"
-                        size="small" (onClick)="editTicket(t)" pTooltip="Editar" />
-                    <p-button *ifHasPermission="'tickets:eliminar'" icon="pi pi-trash" [text]="true" severity="danger"
-                        size="small" (onClick)="confirmDelete(t)" pTooltip="Eliminar" />
+        <!-- Drop zone con DnD -->
+        <div cdkDropList [id]="'col-' + col.status.replace(' ', '-')" [cdkDropListData]="ticketsByStatus(col.status)"
+            [cdkDropListConnectedTo]="dropListIds" (cdkDropListDropped)="onTicketDrop($event, col.status)"
+            class="flex flex-column gap-2" style="min-height: 80px">
+
+            <!-- Ticket cards -->
+            @for (t of ticketsByStatus(col.status); track t.id) {
+            <div cdkDrag class="surface-0 border-1 surface-border border-round p-3 cursor-grab"
+                style="transition: box-shadow .15s ease" (click)="viewTicket(t)">
+                <!-- Drag placeholder -->
+                <div *cdkDragPlaceholder class="border-2 border-dashed border-primary border-round"
+                    style="height:80px; background: var(--p-primary-50)"></div>
+
+                <div class="flex flex-column gap-2">
+                    <div class="flex align-items-start justify-content-between gap-2">
+                        <span class="font-semibold text-900 line-height-2" style="font-size:.875rem">{{ t.titulo
+                            }}</span>
+                        <p-tag [value]="t.prioridad" [severity]="prioritySeverity(t.prioridad)" [rounded]="true"
+                            style="white-space:nowrap; font-size:.65rem" />
+                    </div>
+                    <p class="text-500 text-xs m-0 line-height-2"
+                        style="display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">
+                        {{ t.descripcion }}
+                    </p>
+                    <div class="flex align-items-center justify-content-between mt-1">
+                        <span class="text-500 text-xs"><i class="pi pi-user mr-1"></i>{{ t.asignadoA || 'Sin asignar'
+                            }}</span>
+                        <span class="text-500 text-xs"><i class="pi pi-calendar mr-1"></i>{{ formatDate(t.fechaLimite)
+                            }}</span>
+                    </div>
+                    <div class="text-400 text-xs"><i class="pi pi-clock mr-1"></i>Creado: {{ formatDate(t.fechaCreacion)
+                        }}</div>
+                    <div class="flex gap-1" (click)="$event.stopPropagation()">
+                        <p-button *ifHasPermission="'tickets:editar'" icon="pi pi-pencil" [text]="true"
+                            severity="secondary" size="small" (onClick)="editTicket(t)" pTooltip="Editar" />
+                        <p-button *ifHasPermission="'tickets:eliminar'" icon="pi pi-trash" [text]="true"
+                            severity="danger" size="small" (onClick)="confirmDelete(t)" pTooltip="Eliminar" />
+                    </div>
                 </div>
             </div>
-        </div>
-        }
+            }
 
-        @if (ticketsByStatus(col.status).length === 0) {
-        <div class="text-center text-500 py-4" style="font-size:.8rem">Sin tickets</div>
-        }
+            @if (ticketsByStatus(col.status).length === 0) {
+            <div class="text-center text-500 py-4 border-2 border-dashed surface-border border-round"
+                style="font-size:.8rem">Arrastra tickets aquí</div>
+            }
+        </div>
     </div>
     }
 </div>
@@ -125,7 +145,7 @@
             <td><p-tag [value]="t.estado" [severity]="statusSeverity(t.estado)" [rounded]="true" /></td>
             <td><span class="font-semibold text-900 cursor-pointer" (click)="viewTicket(t)">{{ t.titulo }}</span></td>
             <td><p-tag [value]="t.prioridad" [severity]="prioritySeverity(t.prioridad)" [rounded]="true" /></td>
-            <td>{{ t.asignadoA }}</td>
+            <td>{{ t.asignadoA || 'Sin asignar' }}</td>
             <td>{{ formatDate(t.fechaCreacion) }}</td>
             <td>{{ formatDate(t.fechaLimite) }}</td>
             <td>

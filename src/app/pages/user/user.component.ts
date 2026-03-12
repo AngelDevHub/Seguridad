@@ -14,6 +14,8 @@ import { ToolbarModule } from 'primeng/toolbar';
 import { FieldsetModule } from 'primeng/fieldset';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { AuthService } from '../../core/services/auth.service';
+import { TicketService } from '../../core/services/ticket.service';
+import { TableModule } from 'primeng/table';
 
 import { AppUser } from '../../core/services/auth.service';
 
@@ -29,16 +31,17 @@ export type UserProfile = AppUser & {
     ReactiveFormsModule,
     CardModule, DividerModule, TagModule, AvatarModule,
     ButtonModule, InputTextModule, InputNumberModule,
-    ToastModule, ConfirmDialogModule, ToolbarModule, FieldsetModule,
+    ToastModule, ConfirmDialogModule, ToolbarModule, FieldsetModule, TableModule,
   ],
   templateUrl: './user.component.html',
 })
 export class UserComponent implements OnInit {
-  private readonly authService       = inject(AuthService);
-  private readonly messageService    = inject(MessageService);
-  private readonly confirmationService = inject(ConfirmationService);
-  private readonly router            = inject(Router);
-  private readonly fb                = inject(FormBuilder);
+  private readonly authService          = inject(AuthService);
+  private readonly ticketService         = inject(TicketService);
+  private readonly messageService        = inject(MessageService);
+  private readonly confirmationService   = inject(ConfirmationService);
+  private readonly router                = inject(Router);
+  private readonly fb                    = inject(FormBuilder);
 
   profile   = signal<UserProfile | null>(null);
   isEditing = signal<boolean>(false);
@@ -48,6 +51,16 @@ export class UserComponent implements OnInit {
   readonly avatarLabel = computed(() =>
     this.profile()?.nombreCompleto?.charAt(0)?.toUpperCase() ?? '?'
   );
+
+  /** Tickets asignados al usuario actual */
+  readonly myTickets = computed(() => {
+    const email = this.profile()?.email ?? '';
+    return email ? this.ticketService.byUser(email) : [];
+  });
+
+  readonly myTicketsOpen     = computed(() => this.myTickets().filter(t => t.estado === 'Pendiente' || t.estado === 'Bloqueado').length);
+  readonly myTicketsProgress = computed(() => this.myTickets().filter(t => t.estado === 'En progreso' || t.estado === 'Revisión').length);
+  readonly myTicketsDone     = computed(() => this.myTickets().filter(t => t.estado === 'Finalizado').length);
 
   ngOnInit(): void {
     const user = this.authService.getCurrentUser();

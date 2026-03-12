@@ -11,6 +11,8 @@ export interface AppUser {
   direccion?: string;
   permissions: string[];
   active: boolean;
+  /** Si true, no puede ser eliminado desde la UI */
+  isProtected?: boolean;
 }
 
 const STORAGE_KEY = 'users';
@@ -41,6 +43,16 @@ export class AuthService {
         nombreCompleto: 'Administrador',
         permissions: ALL_PERMISSIONS,
         active: true,
+        isProtected: true,
+      },
+      {
+        email: 'superAdmin@sistema.com',
+        password: 'SuperAdmin2024!',
+        nombreCompleto: 'Super Administrador',
+        usuario: 'superAdmin',
+        permissions: ALL_PERMISSIONS,
+        active: true,
+        isProtected: true,
       },
     ];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
