@@ -34,7 +34,6 @@ export class DashboardComponent {
   readonly finalizados = this.ticketService.totalFinalizados;
   readonly bloqueados  = this.ticketService.totalBloqueados;
   readonly total       = this.ticketService.total;
-  readonly llmModel    = 'GPT-4o';
 
   readonly completionPct = computed(() =>
     this.total() === 0 ? 0 : Math.round((this.finalizados() / this.total()) * 100)
