@@ -1,5 +1,9 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { catchError, of } from 'rxjs';
 import { Ticket, TicketStatus, TicketComment, HistorialCambio } from '../models/ticket.model';
+import { environment } from '../../../environments/environment';
+import { ApiResponse } from '../models/api.model';
 
 const STORAGE_KEY = 'tickets';
 
@@ -11,8 +15,15 @@ function futureDate(days: number): string { return new Date(Date.now() + days * 
 
 @Injectable({ providedIn: 'root' })
 export class TicketService {
+  private readonly http = inject(HttpClient);
   private readonly _tickets = signal<Ticket[]>(this.load());
   readonly tickets = this._tickets.asReadonly();
+
+  constructor() {
+    if (localStorage.getItem(environment.jwtKey)) {
+      this.refreshAll();
+    }
+  }
 
   // ── Global computed stats ──────────────────────────────────────
   readonly totalPendientes  = computed(() => this._tickets().filter(t => t.estado === 'Pendiente').length);
@@ -83,6 +94,20 @@ export class TicketService {
     this._tickets.set([...tickets]);
   }
 
+  refreshAll(): void {
+    this.http.get<ApiResponse<Ticket[]>>(`${environment.apiUrl}/tickets`).pipe(
+      catchError(() => of(null)),
+    ).subscribe((res) => {
+      if (!res || !res.success) return;
+      const list = (res.data ?? []).map((t: any) => ({
+        ...t,
+        comentarios: t.comentarios ?? [],
+        historialCambios: t.historialCambios ?? [],
+      })) as Ticket[];
+      this.persist(list);
+    });
+  }
+
   // ── Queries ───────────────────────────────────────────────────
   byGroup(groupId: string): Ticket[] {
     return this._tickets().filter(t => t.groupId === groupId);
@@ -104,6 +129,37 @@ export class TicketService {
 
   // ── CRUD ──────────────────────────────────────────────────────
   add(data: Omit<Ticket, 'id' | 'fechaCreacion' | 'comentarios' | 'historialCambios'>, usuario = 'Sistema'): Ticket {
+    if (localStorage.getItem(environment.jwtKey)) {
+      const payload: any = {
+        titulo: data.titulo,
+        descripcion: data.descripcion,
+        estado: data.estado,
+        prioridad: data.prioridad,
+        asignadoA: data.asignadoA,
+        fechaLimite: data.fechaLimite,
+        groupId: data.groupId,
+      };
+      this.http.post<ApiResponse<Ticket>>(`${environment.apiUrl}/tickets`, payload).pipe(
+        catchError(() => of(null)),
+      ).subscribe((res) => {
+        if (!res || !res.success) return;
+        const created = res.data as any as Ticket;
+        const merged = [...this._tickets().filter((x) => x.id !== created.id), created]
+          .sort((a, b) => b.fechaCreacion.localeCompare(a.fechaCreacion));
+        this.persist(merged);
+      });
+      const temp: Ticket = {
+        id: generateId(),
+        ...data,
+        fechaCreacion: now(),
+        comentarios: [],
+        historialCambios: [{
+          id: generateId(), campo: 'estado', valorAnterior: '', valorNuevo: data.estado,
+          fecha: now(), usuario,
+        }],
+      };
+      return temp;
+    }
     const historial: HistorialCambio[] = [{
       id: generateId(), campo: 'estado', valorAnterior: '', valorNuevo: data.estado,
       fecha: now(), usuario,
@@ -117,6 +173,25 @@ export class TicketService {
   }
 
   update(id: string, changes: Partial<Omit<Ticket, 'id' | 'groupId' | 'fechaCreacion' | 'comentarios' | 'historialCambios'>>, usuario = 'Sistema'): boolean {
+    if (localStorage.getItem(environment.jwtKey)) {
+      const payload: any = {};
+      if (changes.titulo !== undefined) payload.titulo = changes.titulo;
+      if (changes.descripcion !== undefined) payload.descripcion = changes.descripcion;
+      if (changes.estado !== undefined) payload.estado = changes.estado;
+      if (changes.prioridad !== undefined) payload.prioridad = changes.prioridad;
+      if (changes.asignadoA !== undefined) payload.asignadoA = changes.asignadoA;
+      if (changes.fechaLimite !== undefined) payload.fechaLimite = changes.fechaLimite;
+
+      this.http.patch<ApiResponse<Ticket>>(`${environment.apiUrl}/tickets/${id}`, payload).pipe(
+        catchError(() => of(null)),
+      ).subscribe((res) => {
+        if (!res || !res.success) return;
+        const updated = res.data as any as Ticket;
+        const next = this._tickets().map((t) => t.id === id ? updated : t);
+        this.persist(next);
+      });
+      return true;
+    }
     const list  = this._tickets();
     const idx   = list.findIndex(t => t.id === id);
     if (idx === -1) return false;
@@ -135,6 +210,16 @@ export class TicketService {
   }
 
   delete(id: string): boolean {
+    if (localStorage.getItem(environment.jwtKey)) {
+      this.http.delete<ApiResponse<any>>(`${environment.apiUrl}/tickets/${id}`).pipe(
+        catchError(() => of(null)),
+      ).subscribe((res) => {
+        if (!res || !res.success) return;
+        const filtered = this._tickets().filter(t => t.id !== id);
+        this.persist(filtered);
+      });
+      return true;
+    }
     const filtered = this._tickets().filter(t => t.id !== id);
     if (filtered.length === this._tickets().length) return false;
     this.persist(filtered);
@@ -143,6 +228,17 @@ export class TicketService {
 
   // ── Comentarios ───────────────────────────────────────────────
   addComment(ticketId: string, autor: string, texto: string): boolean {
+    if (localStorage.getItem(environment.jwtKey)) {
+      this.http.post<ApiResponse<Ticket>>(`${environment.apiUrl}/tickets/${ticketId}/comments`, { texto }).pipe(
+        catchError(() => of(null)),
+      ).subscribe((res) => {
+        if (!res || !res.success) return;
+        const updated = res.data as any as Ticket;
+        const next = this._tickets().map((t) => t.id === ticketId ? updated : t);
+        this.persist(next);
+      });
+      return true;
+    }
     const list = this._tickets();
     const idx  = list.findIndex(t => t.id === ticketId);
     if (idx === -1) return false;

@@ -1,4 +1,8 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { catchError, of } from 'rxjs';
+import { environment } from '../../../environments/environment';
+import { ApiResponse } from '../models/api.model';
 
 export interface Group {
   id: string;
@@ -19,8 +23,13 @@ function generateId(): string {
 
 @Injectable({ providedIn: 'root' })
 export class GroupCrudService {
+  private readonly http = inject(HttpClient);
   private readonly _groups = signal<Group[]>(this.load());
   readonly groups = this._groups.asReadonly();
+
+  constructor() {
+    this.refreshFromBackend();
+  }
 
   private load(): Group[] {
     try {
@@ -36,6 +45,25 @@ export class GroupCrudService {
     } catch {
       return this.seedData();
     }
+  }
+
+  refreshFromBackend(): void {
+    this.http.get<ApiResponse<any[]>>(`${environment.apiUrl}/groups`).pipe(
+      catchError(() => of(null)),
+    ).subscribe((res) => {
+      if (!res || !res.success) return;
+      const mapped: Group[] = (res.data ?? []).map((g: any) => ({
+        id: g.id,
+        nombre: g.nombre,
+        categoria: g.categoria ?? 'General',
+        nivel: g.nivel ?? 'Básico',
+        autor: g.autor ?? '',
+        miembros: g.miembros ?? 0,
+        tickets: g.tickets ?? 0,
+        miembrosList: [],
+      }));
+      if (mapped.length) this.persist(mapped);
+    });
   }
 
   private seedData(): Group[] {

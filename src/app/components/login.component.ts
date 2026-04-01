@@ -3,6 +3,8 @@ import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angula
 import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
 import { PermissionsService } from '../core/services/permissions.service';
+import { TicketService } from '../core/services/ticket.service';
+import { GroupCrudService } from '../core/services/group-crud.service';
 import { CommonModule } from '@angular/common';
 import { CardModule } from 'primeng/card';
 import { InputTextModule } from 'primeng/inputtext';
@@ -22,6 +24,8 @@ import { MessageModule } from 'primeng/message';
 export class LoginComponent {
   private readonly authService = inject(AuthService);
   private readonly permsSvc   = inject(PermissionsService);
+  private readonly ticketSvc  = inject(TicketService);
+  private readonly groupSvc   = inject(GroupCrudService);
   private readonly router      = inject(Router);
   private readonly fb          = inject(FormBuilder);
 
@@ -38,14 +42,22 @@ export class LoginComponent {
       return;
     }
     const { email, password } = this.form.value;
-    const user = this.authService.login(email, password);
+    this.authService.loginWithBackend(email, password).subscribe((backendUser) => {
+      if (backendUser) {
+        this.permsSvc.setPermissions(backendUser.permissions ?? []);
+        this.ticketSvc.refreshAll();
+        this.groupSvc.refreshFromBackend();
+        this.router.navigate(['/dashboard']);
+        return;
+      }
 
-    if (user) {
-      // Simula carga de permisos desde JWT → carga los permisos del usuario
-      this.permsSvc.setPermissions(user.permissions ?? []);
-      this.router.navigate(['/dashboard']);
-    } else {
-      this.error = 'Credenciales incorrectas o cuenta inactiva';
-    }
+      const user = this.authService.login(email, password);
+      if (user) {
+        this.permsSvc.setPermissions(user.permissions ?? []);
+        this.router.navigate(['/dashboard']);
+      } else {
+        this.error = 'Credenciales incorrectas o cuenta inactiva';
+      }
+    });
   }
 }

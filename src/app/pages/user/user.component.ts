@@ -16,6 +16,7 @@ import { MessageService, ConfirmationService } from 'primeng/api';
 import { AuthService } from '../../core/services/auth.service';
 import { TicketService } from '../../core/services/ticket.service';
 import { TableModule } from 'primeng/table';
+import { environment } from '../../../environments/environment';
 
 import { AppUser } from '../../core/services/auth.service';
 
@@ -102,8 +103,31 @@ export class UserComponent implements OnInit {
       return;
     }
     this.isSaving.set(true);
-    const originalEmail = this.profile()!.email;
-    const updated: UserProfile = { ...this.profile()!, ...this.editForm.value };
+    const current = this.profile()!;
+    const updated: UserProfile = { ...current, ...this.editForm.value };
+
+    if (current.id) {
+      this.authService.updateUserWithBackend(current.id, updated).subscribe((res) => {
+        this.isSaving.set(false);
+        if (res) {
+          this.profile.set({ ...updated, id: res.id, permissions: res.permissions ?? updated.permissions });
+          localStorage.setItem(environment.currentUserKey, JSON.stringify({
+            id: res.id,
+            nombre_completo: res.nombreCompleto,
+            username: res.username,
+            email: res.email,
+            permissions: res.permissions ?? [],
+          }));
+          this.isEditing.set(false);
+          this.messageService.add({ severity: 'success', summary: 'Perfil actualizado', detail: 'Los cambios se guardaron correctamente.', life: 3500 });
+        } else {
+          this.messageService.add({ severity: 'error', summary: 'Error', detail: 'No se pudo actualizar el perfil.', life: 5000 });
+        }
+      });
+      return;
+    }
+
+    const originalEmail = current.email;
     const result = this.authService.updateUser(originalEmail, updated);
     this.isSaving.set(false);
     if (result.ok || result.reason === 'not_found') {
@@ -123,9 +147,18 @@ export class UserComponent implements OnInit {
       acceptLabel: 'Sí, eliminar', rejectLabel: 'Cancelar',
       acceptButtonStyleClass: 'p-button-danger',
       accept: () => {
-        this.authService.deleteUser(this.profile()!.email);
-        this.messageService.add({ severity: 'error', summary: 'Perfil eliminado', detail: 'Redirigiendo...', life: 2500 });
-        setTimeout(() => this.router.navigate(['/login']), 2600);
+        const p = this.profile()!;
+        if (p.id) {
+          this.authService.deleteUserWithBackend(p.id).subscribe(() => {
+            this.authService.logout();
+            this.messageService.add({ severity: 'error', summary: 'Perfil eliminado', detail: 'Redirigiendo...', life: 2500 });
+            setTimeout(() => this.router.navigate(['/login']), 2600);
+          });
+        } else {
+          this.authService.deleteUser(p.email);
+          this.messageService.add({ severity: 'error', summary: 'Perfil eliminado', detail: 'Redirigiendo...', life: 2500 });
+          setTimeout(() => this.router.navigate(['/login']), 2600);
+        }
       },
     });
   }

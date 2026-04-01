@@ -49,6 +49,7 @@ export class AdminUsersComponent implements OnInit {
   formDialogVisible  = false;   // dialog Crear / Editar
   permsDialogVisible = false;   // dialog Asignar Permisos
   editingEmail       = '';
+  editingId          = '';
   isSaving           = signal(false);
 
   // ── All permissions grouped for multiselect ──────────────────
@@ -86,12 +87,21 @@ export class AdminUsersComponent implements OnInit {
 
   ngOnInit(): void { this.loadUsers(); }
 
-  loadUsers():  void { this.users.set(this.authSvc.getUsers()); }
+  loadUsers(): void {
+    this.authSvc.listUsersWithBackend().subscribe((list) => {
+      if (list.length) {
+        this.users.set(list);
+      } else {
+        this.users.set(this.authSvc.getUsers());
+      }
+    });
+  }
 
   // ── Dialogs ──────────────────────────────────────────────────
   openCreate(): void {
     this.dialogMode.set('create');
     this.editingEmail = '';
+    this.editingId = '';
     this.form.reset({ permissions: [] });
     this.form.get('password')?.setValidators([Validators.required, Validators.minLength(6)]);
     this.form.get('password')?.updateValueAndValidity();
@@ -101,6 +111,7 @@ export class AdminUsersComponent implements OnInit {
   openEdit(u: AppUser): void {
     this.dialogMode.set('edit');
     this.editingEmail = u.email;
+    this.editingId = u.id ?? '';
     this.form.reset({
       nombreCompleto: u.nombreCompleto ?? '',
       email:          u.email,
@@ -114,6 +125,7 @@ export class AdminUsersComponent implements OnInit {
 
   openPermissions(u: AppUser): void {
     this.editingEmail = u.email;
+    this.editingId = u.id ?? '';
     this.permsForm.reset({ permissions: u.permissions ?? [] });
     this.permsDialogVisible = true;
   }
@@ -130,34 +142,70 @@ export class AdminUsersComponent implements OnInit {
     const val = this.form.value;
 
     if (this.dialogMode() === 'create') {
-      const ok = this.authSvc.register({
+      this.authSvc.createUserWithBackend({
         nombreCompleto: val.nombreCompleto,
         email: val.email,
         password: val.password,
         permissions: val.permissions ?? [],
-      });
-      if (ok) {
-        // Si tiene permisos, guárdalos
-        if (val.permissions?.length) {
-          this.authSvc.updateUserPermissions(val.email, val.permissions);
+      }).subscribe((created) => {
+        if (created) {
+          this.msgSvc.add({ severity: 'success', summary: 'Usuario creado', detail: `${val.nombreCompleto} registrado.`, life: 3000 });
+          this.closeDialog();
+          this.loadUsers();
+        } else {
+          const ok = this.authSvc.register({
+            nombreCompleto: val.nombreCompleto,
+            email: val.email,
+            password: val.password,
+            permissions: val.permissions ?? [],
+          });
+          if (ok) {
+            if (val.permissions?.length) {
+              this.authSvc.updateUserPermissions(val.email, val.permissions);
+            }
+            this.msgSvc.add({ severity: 'success', summary: 'Usuario creado (local)', detail: `${val.nombreCompleto} registrado.`, life: 3000 });
+            this.closeDialog();
+            this.loadUsers();
+          } else {
+            this.msgSvc.add({ severity: 'error', summary: 'Error', detail: 'El email ya está registrado.', life: 4000 });
+          }
         }
-        this.msgSvc.add({ severity: 'success', summary: 'Usuario creado', detail: `${val.nombreCompleto} registrado.`, life: 3000 });
-        this.closeDialog();
-        this.loadUsers();
-      } else {
-        this.msgSvc.add({ severity: 'error', summary: 'Error', detail: 'El email ya está registrado.', life: 4000 });
-      }
+        this.isSaving.set(false);
+      });
+      return;
     } else {
       const data: Partial<AppUser> = { nombreCompleto: val.nombreCompleto, email: val.email, permissions: val.permissions ?? [] };
       if (val.password?.trim()) data['password'] = val.password;
-      const res = this.authSvc.updateUser(this.editingEmail, data);
-      if (res.ok) {
-        this.msgSvc.add({ severity: 'success', summary: 'Actualizado', detail: 'Datos guardados.', life: 3000 });
-        this.closeDialog();
-        this.loadUsers();
+      if (this.editingId) {
+        this.authSvc.updateUserWithBackend(this.editingId, data).subscribe((updated) => {
+          if (updated) {
+            this.msgSvc.add({ severity: 'success', summary: 'Actualizado', detail: 'Datos guardados.', life: 3000 });
+            this.closeDialog();
+            this.loadUsers();
+          } else {
+            const res = this.authSvc.updateUser(this.editingEmail, data);
+            if (res.ok) {
+              this.msgSvc.add({ severity: 'success', summary: 'Actualizado (local)', detail: 'Datos guardados.', life: 3000 });
+              this.closeDialog();
+              this.loadUsers();
+            } else {
+              const msg = res.reason === 'email_taken' ? 'El nuevo email ya está en uso.' : 'Usuario no encontrado.';
+              this.msgSvc.add({ severity: 'error', summary: 'Error', detail: msg, life: 4000 });
+            }
+          }
+          this.isSaving.set(false);
+        });
+        return;
       } else {
-        const msg = res.reason === 'email_taken' ? 'El nuevo email ya está en uso.' : 'Usuario no encontrado.';
-        this.msgSvc.add({ severity: 'error', summary: 'Error', detail: msg, life: 4000 });
+        const res = this.authSvc.updateUser(this.editingEmail, data);
+        if (res.ok) {
+          this.msgSvc.add({ severity: 'success', summary: 'Actualizado', detail: 'Datos guardados.', life: 3000 });
+          this.closeDialog();
+          this.loadUsers();
+        } else {
+          const msg = res.reason === 'email_taken' ? 'El nuevo email ya está en uso.' : 'Usuario no encontrado.';
+          this.msgSvc.add({ severity: 'error', summary: 'Error', detail: msg, life: 4000 });
+        }
       }
     }
     this.isSaving.set(false);
@@ -165,9 +213,22 @@ export class AdminUsersComponent implements OnInit {
 
   savePermissions(): void {
     const perms: string[] = this.permsForm.value.permissions ?? [];
+    if (this.editingId) {
+      this.authSvc.updateUserWithBackend(this.editingId, { permissions: perms }).subscribe((updated) => {
+        if (updated) {
+          const current = this.authSvc.getCurrentUser();
+          if (current?.id === this.editingId) {
+            this.permsSvc.setPermissions(perms);
+          }
+          this.msgSvc.add({ severity: 'success', summary: 'Permisos actualizados', life: 3000 });
+          this.closeDialog();
+          this.loadUsers();
+        }
+      });
+      return;
+    }
     const ok = this.authSvc.updateUserPermissions(this.editingEmail, perms);
     if (ok) {
-      // Si es el usuario actual, actualiza los permisos en sesión
       const current = this.authSvc.getCurrentUser();
       if (current?.email === this.editingEmail) {
         this.permsSvc.setPermissions(perms);
@@ -186,16 +247,33 @@ export class AdminUsersComponent implements OnInit {
       acceptLabel: 'Sí, eliminar', rejectLabel: 'Cancelar',
       acceptButtonStyleClass: 'p-button-danger',
       accept: () => {
-        this.authSvc.deleteUser(u.email);
-        this.msgSvc.add({ severity: 'info', summary: 'Usuario eliminado', life: 3000 });
-        this.loadUsers();
+        if (u.id) {
+          this.authSvc.deleteUserWithBackend(u.id).subscribe((ok) => {
+            if (ok) {
+              this.msgSvc.add({ severity: 'info', summary: 'Usuario eliminado', life: 3000 });
+              this.loadUsers();
+            } else {
+              this.authSvc.deleteUser(u.email);
+              this.msgSvc.add({ severity: 'info', summary: 'Usuario eliminado (local)', life: 3000 });
+              this.loadUsers();
+            }
+          });
+        } else {
+          this.authSvc.deleteUser(u.email);
+          this.msgSvc.add({ severity: 'info', summary: 'Usuario eliminado', life: 3000 });
+          this.loadUsers();
+        }
       },
     });
   }
 
   toggleActive(u: AppUser): void {
-    this.authSvc.toggleUserActive(u.email);
-    this.loadUsers();
+    if (u.id) {
+      this.authSvc.updateUserWithBackend(u.id, { active: !u.active }).subscribe(() => this.loadUsers());
+    } else {
+      this.authSvc.toggleUserActive(u.email);
+      this.loadUsers();
+    }
   }
 
   // ── Helpers ──────────────────────────────────────────────────

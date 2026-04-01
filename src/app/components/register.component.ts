@@ -63,18 +63,24 @@ export class RegisterComponent {
     }
 
     const userData = this.form.value;
-    const userToSave = { ...userData, password: userData.contrasena };
-
-    if (this.authService.register(userToSave)) {
-      this.success = true;
-      this.error = '';
-      setTimeout(() => {
-        this.router.navigate(['/login']);
-      }, 1500);
-    } else {
-      this.error = 'El correo ya está registrado';
-      this.success = false;
-    }
+    this.authService.registerWithBackend(userData).subscribe({
+      next: () => {
+        this.success = true;
+        this.error = '';
+        setTimeout(() => this.router.navigate(['/login']), 1500);
+      },
+      error: () => {
+        const userToSave = { ...userData, password: userData.contrasena };
+        if (this.authService.register(userToSave)) {
+          this.success = true;
+          this.error = '';
+          setTimeout(() => this.router.navigate(['/login']), 1500);
+        } else {
+          this.error = 'El correo ya está registrado';
+          this.success = false;
+        }
+      },
+    });
   }
 
   /** Elimina espacios duplicados y espacios iniciales en el nombre */
