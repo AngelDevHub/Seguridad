@@ -65,7 +65,7 @@ export class UserComponent implements OnInit {
 
   ngOnInit(): void {
     const user = this.authService.getCurrentUser();
-    this.profile.set(user ?? {
+    const initial = user ?? {
       email: 'usuario@demo.com',
       password: '',
       permissions: [],
@@ -77,8 +77,39 @@ export class UserComponent implements OnInit {
       edad: 0,
       rol: 'Sin rol',
       fechaRegistro: 'N/A',
-    });
+    };
+    this.profile.set(this.withDerivedFields(initial));
     this.buildForm();
+
+    const current = this.profile();
+    if (current?.id && this.authService.getToken()) {
+      this.authService.getUserByIdWithBackend(current.id).subscribe((fresh) => {
+        if (!fresh) return;
+        this.profile.set(this.withDerivedFields({ ...this.profile(), ...fresh }));
+        if (!this.isEditing()) this.buildForm();
+      });
+    }
+  }
+
+  private withDerivedFields(p: UserProfile): UserProfile {
+    const permissions = p.permissions ?? [];
+    const isAdmin = permissions.includes('usuarios:asignarPermisos') || permissions.some((x) => String(x).startsWith('usuarios:'));
+    const rol = p.rol ?? (isAdmin ? 'Administrador' : permissions.length ? 'Usuario' : 'Sin rol');
+
+    const fechaRaw = p.fechaRegistro ?? p.fechaInicio ?? '';
+    const fechaRegistro = fechaRaw ? String(fechaRaw).slice(0, 10) : 'N/A';
+
+    const edad = typeof p.edad === 'number' && p.edad > 0 ? p.edad : (p.edad ?? 0);
+
+    return {
+      ...p,
+      usuario: p.usuario ?? p.username ?? '',
+      telefono: p.telefono ?? '',
+      direccion: p.direccion ?? '',
+      edad,
+      rol,
+      fechaRegistro,
+    };
   }
 
   private buildForm(): void {
@@ -110,13 +141,17 @@ export class UserComponent implements OnInit {
       this.authService.updateUserWithBackend(current.id, updated).subscribe((res) => {
         this.isSaving.set(false);
         if (res) {
-          this.profile.set({ ...updated, id: res.id, permissions: res.permissions ?? updated.permissions });
+          this.profile.set(this.withDerivedFields({ ...updated, ...res, permissions: res.permissions ?? updated.permissions }));
           localStorage.setItem(environment.currentUserKey, JSON.stringify({
-            id: res.id,
-            nombre_completo: res.nombreCompleto,
-            username: res.username,
-            email: res.email,
-            permissions: res.permissions ?? [],
+            id: res.id ?? current.id,
+            nombre_completo: (res.nombreCompleto ?? updated.nombreCompleto) ?? '',
+            username: (updated.usuario ?? res.usuario ?? res.username) ?? '',
+            email: (res.email ?? updated.email) ?? '',
+            permissions: res.permissions ?? updated.permissions ?? [],
+            telefono: updated.telefono ?? res.telefono ?? '',
+            direccion: updated.direccion ?? res.direccion ?? '',
+            fecha_inicio: res.fechaInicio ?? current.fechaInicio ?? null,
+            fecha_nacimiento: res.fechaNacimiento ?? current.fechaNacimiento ?? null,
           }));
           this.isEditing.set(false);
           this.messageService.add({ severity: 'success', summary: 'Perfil actualizado', detail: 'Los cambios se guardaron correctamente.', life: 3500 });

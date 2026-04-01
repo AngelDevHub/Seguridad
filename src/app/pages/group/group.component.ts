@@ -20,6 +20,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { GroupCrudService, Group } from '../../core/services/group-crud.service';
 import { IfHasPermissionDirective } from '../../core/directives/if-has-permission.directive';
+import { AuthService } from '../../core/services/auth.service';
 
 type TagSeverity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast' | undefined;
 
@@ -41,6 +42,7 @@ export class GroupComponent implements OnInit {
   private readonly confirmationService = inject(ConfirmationService);
   private readonly fb                  = inject(FormBuilder);
   private readonly router              = inject(Router);
+  private readonly authService         = inject(AuthService);
 
   groups        = this.groupService.groups;
   dialogVisible = signal(false);
@@ -64,13 +66,14 @@ export class GroupComponent implements OnInit {
   ngOnInit(): void { this.buildForm(); }
 
   private buildForm(data?: Partial<Group>): void {
+    const currentName = this.authService.getCurrentUser()?.nombreCompleto ?? '';
     this.form = this.fb.group({
       nombre:    [data?.nombre    ?? '', [Validators.required, Validators.minLength(2)]],
       categoria: [data?.categoria ?? '', [Validators.required]],
       nivel:     [data?.nivel     ?? 'Básico', [Validators.required]],
-      autor:     [data?.autor     ?? '', [Validators.required]],
-      miembros:  [data?.miembros  ?? 1,  [Validators.required, Validators.min(1)]],
-      tickets:   [data?.tickets   ?? 0,  [Validators.required, Validators.min(0)]],
+      autor:     [{ value: data?.autor ?? currentName, disabled: true }],
+      miembros:  [{ value: data?.miembros ?? 1, disabled: true }],
+      tickets:   [{ value: data?.tickets ?? 0, disabled: true }],
     });
   }
 
@@ -90,19 +93,36 @@ export class GroupComponent implements OnInit {
     }
     this.isSaving.set(true);
     const formVal = this.form.value;
-    const full: Omit<Group, 'id'> = { ...formVal, miembrosList: [] };
 
     if (this.isEditMode()) {
-      const existing = this.groupService.getById(this.editingId()!);
-      full.miembrosList = existing?.miembrosList ?? [];
-      const ok = this.groupService.update(this.editingId()!, full);
-      this.isSaving.set(false);
-      if (ok) { this.messageService.add({ severity: 'success', summary: 'Grupo actualizado', detail: `"${formVal.nombre}" actualizado.`, life: 3500 }); this.closeDialog(); }
+      this.groupService.update(this.editingId()!, {
+        nombre: formVal.nombre,
+        categoria: formVal.categoria,
+        nivel: formVal.nivel,
+      }).subscribe((updated) => {
+        this.isSaving.set(false);
+        if (updated) {
+          if (this.selectedGroup()?.id === updated.id) this.selectedGroup.set(updated);
+          this.messageService.add({ severity: 'success', summary: 'Grupo actualizado', detail: `"${updated.nombre}" actualizado.`, life: 3500 });
+          this.closeDialog();
+        } else {
+          this.messageService.add({ severity: 'error', summary: 'Error', detail: 'No se pudo actualizar.', life: 4000 });
+        }
+      });
     } else {
-      this.groupService.add(full);
-      this.isSaving.set(false);
-      this.messageService.add({ severity: 'success', summary: 'Grupo creado', detail: `"${formVal.nombre}" agregado.`, life: 3500 });
-      this.closeDialog();
+      this.groupService.add({
+        nombre: formVal.nombre,
+        categoria: formVal.categoria,
+        nivel: formVal.nivel,
+      }).subscribe((created) => {
+        this.isSaving.set(false);
+        if (created) {
+          this.messageService.add({ severity: 'success', summary: 'Grupo creado', detail: `"${created.nombre}" agregado.`, life: 3500 });
+          this.closeDialog();
+        } else {
+          this.messageService.add({ severity: 'error', summary: 'Error', detail: 'No se pudo crear.', life: 4000 });
+        }
+      });
     }
   }
 
@@ -113,10 +133,11 @@ export class GroupComponent implements OnInit {
       acceptButtonStyleClass: 'p-button-danger',
       accept: () => {
         if (this.selectedGroup()?.id === g.id) this.selectedGroup.set(null);
-        const ok = this.groupService.delete(g.id);
-        this.messageService.add(ok
-          ? { severity: 'info',  summary: 'Eliminado', detail: `"${g.nombre}" fue eliminado.`, life: 3500 }
-          : { severity: 'error', summary: 'Error', detail: 'No se pudo eliminar.', life: 4000 });
+        this.groupService.delete(g.id).subscribe((ok) => {
+          this.messageService.add(ok
+            ? { severity: 'info',  summary: 'Eliminado', detail: `"${g.nombre}" fue eliminado.`, life: 3500 }
+            : { severity: 'error', summary: 'Error', detail: 'No se pudo eliminar.', life: 4000 });
+        });
       },
     });
   }
@@ -133,22 +154,28 @@ export class GroupComponent implements OnInit {
   addMember(): void {
     const id = this.selectedGroup()?.id;
     if (!id || !this.newMemberInput.trim()) return;
-    const ok = this.groupService.addMember(id, this.newMemberInput.trim());
-    if (ok) {
-      this.selectedGroup.set(this.groupService.getById(id) ?? null);
-      this.newMemberInput = '';
-      this.messageService.add({ severity: 'success', summary: 'Miembro agregado',  life: 2500 });
-    } else {
-      this.messageService.add({ severity: 'warn', summary: 'Ya existe o inválido', life: 3000 });
-    }
+    this.groupService.addMember(id, this.newMemberInput.trim()).subscribe((updated) => {
+      if (updated) {
+        this.selectedGroup.set(updated);
+        this.newMemberInput = '';
+        this.messageService.add({ severity: 'success', summary: 'Miembro agregado', life: 2500 });
+      } else {
+        this.messageService.add({ severity: 'warn', summary: 'Ya existe o inválido', life: 3000 });
+      }
+    });
   }
 
   removeMember(identifier: string): void {
     const id = this.selectedGroup()?.id;
     if (!id) return;
-    this.groupService.removeMember(id, identifier);
-    this.selectedGroup.set(this.groupService.getById(id) ?? null);
-    this.messageService.add({ severity: 'info', summary: 'Miembro eliminado', life: 2500 });
+    this.groupService.removeMember(id, identifier).subscribe((updated) => {
+      if (updated) {
+        this.selectedGroup.set(updated);
+        this.messageService.add({ severity: 'info', summary: 'Miembro eliminado', life: 2500 });
+      } else {
+        this.messageService.add({ severity: 'warn', summary: 'No se pudo eliminar', life: 2500 });
+      }
+    });
   }
 
   // ── Helpers ───────────────────────────────────────────────────

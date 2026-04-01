@@ -1,6 +1,6 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { catchError, of } from 'rxjs';
+import { catchError, map, of, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api.model';
 
@@ -60,7 +60,7 @@ export class GroupCrudService {
         autor: g.autor ?? '',
         miembros: g.miembros ?? 0,
         tickets: g.tickets ?? 0,
-        miembrosList: [],
+        miembrosList: Array.isArray(g.miembrosList) ? g.miembrosList : [],
       }));
       if (mapped.length) this.persist(mapped);
     });
@@ -85,50 +85,131 @@ export class GroupCrudService {
     return this._groups().find(g => g.id === id);
   }
 
-  add(data: Omit<Group, 'id'>): Group {
-    const newGroup: Group = { id: generateId(), ...data };
+  add(data: Pick<Group, 'nombre' | 'categoria' | 'nivel'> & Partial<Pick<Group, 'autor'>>): Observable<Group | null> {
+    if (localStorage.getItem(environment.jwtKey)) {
+      const payload: any = {
+        nombre: data.nombre,
+        categoria: data.categoria,
+        nivel: data.nivel,
+      };
+      return this.http.post<ApiResponse<Group>>(`${environment.apiUrl}/groups`, payload).pipe(
+        map((r) => {
+          if (!r.success) return null;
+          const created = r.data as any as Group;
+          const next = [...this._groups().filter((g) => g.id !== created.id), created];
+          this.persist(next);
+          return created;
+        }),
+        catchError(() => of(null)),
+      );
+    }
+
+    const newGroup: Group = {
+      id: generateId(),
+      nombre: data.nombre,
+      categoria: data.categoria,
+      nivel: data.nivel,
+      autor: data.autor ?? '',
+      miembros: 1,
+      tickets: 0,
+      miembrosList: [],
+    };
     this.persist([...this._groups(), newGroup]);
-    return newGroup;
+    return of(newGroup);
   }
 
-  update(id: string, data: Omit<Group, 'id'>): boolean {
+  update(id: string, data: Partial<Pick<Group, 'nombre' | 'categoria' | 'nivel'>>): Observable<Group | null> {
+    if (localStorage.getItem(environment.jwtKey)) {
+      const payload: any = {};
+      if (data.nombre !== undefined) payload.nombre = data.nombre;
+      if (data.categoria !== undefined) payload.categoria = data.categoria;
+      if (data.nivel !== undefined) payload.nivel = data.nivel;
+
+      return this.http.patch<ApiResponse<Group>>(`${environment.apiUrl}/groups/${id}`, payload).pipe(
+        map((r) => {
+          if (!r.success) return null;
+          const updated = r.data as any as Group;
+          const next = this._groups().map((g) => g.id === id ? updated : g);
+          this.persist(next);
+          return updated;
+        }),
+        catchError(() => of(null)),
+      );
+    }
+
     const list = this._groups();
-    const idx  = list.findIndex(g => g.id === id);
-    if (idx === -1) return false;
-    this.persist(list.map(g => g.id === id ? { ...g, ...data } : g));
-    return true;
+    const idx = list.findIndex(g => g.id === id);
+    if (idx === -1) return of(null);
+    const updated: Group = { ...list[idx], ...data };
+    this.persist(list.map(g => g.id === id ? updated : g));
+    return of(updated);
   }
 
-  delete(id: string): boolean {
+  delete(id: string): Observable<boolean> {
+    if (localStorage.getItem(environment.jwtKey)) {
+      return this.http.delete<ApiResponse<any>>(`${environment.apiUrl}/groups/${id}`).pipe(
+        map((r) => {
+          if (!r.success) return false;
+          const filtered = this._groups().filter(g => g.id !== id);
+          this.persist(filtered);
+          return true;
+        }),
+        catchError(() => of(false)),
+      );
+    }
+
     const filtered = this._groups().filter(g => g.id !== id);
-    if (filtered.length === this._groups().length) return false;
+    if (filtered.length === this._groups().length) return of(false);
     this.persist(filtered);
-    return true;
+    return of(true);
   }
 
-  addMember(groupId: string, memberIdentifier: string): boolean {
+  addMember(groupId: string, email: string): Observable<Group | null> {
+    if (localStorage.getItem(environment.jwtKey)) {
+      return this.http.post<ApiResponse<Group>>(`${environment.apiUrl}/groups/${groupId}/members`, { email }).pipe(
+        map((r) => {
+          if (!r.success) return null;
+          const updated = r.data as any as Group;
+          const next = this._groups().map((g) => g.id === groupId ? updated : g);
+          this.persist(next);
+          return updated;
+        }),
+        catchError(() => of(null)),
+      );
+    }
+
     const group = this._groups().find(g => g.id === groupId);
-    if (!group) return false;
-    const identifier = memberIdentifier.trim().toLowerCase();
-    if (!identifier || group.miembrosList.includes(identifier)) return false;
-    const updated = this._groups().map(g =>
-      g.id === groupId
-        ? { ...g, miembrosList: [...g.miembrosList, identifier], miembros: g.miembrosList.length + 1 }
-        : g
-    );
-    this.persist(updated);
-    return true;
+    if (!group) return of(null);
+    const identifier = email.trim().toLowerCase();
+    if (!identifier || group.miembrosList.includes(identifier)) return of(null);
+    const updated: Group = { ...group, miembrosList: [...group.miembrosList, identifier], miembros: group.miembrosList.length + 1 };
+    const next = this._groups().map(g => g.id === groupId ? updated : g);
+    this.persist(next);
+    return of(updated);
   }
 
-  removeMember(groupId: string, memberIdentifier: string): boolean {
+  removeMember(groupId: string, email: string): Observable<Group | null> {
+    if (localStorage.getItem(environment.jwtKey)) {
+      return this.http.delete<ApiResponse<Group>>(`${environment.apiUrl}/groups/${groupId}/members/${encodeURIComponent(email)}`).pipe(
+        map((r) => {
+          if (!r.success) return null;
+          const updated = r.data as any as Group;
+          const next = this._groups().map((g) => g.id === groupId ? updated : g);
+          this.persist(next);
+          return updated;
+        }),
+        catchError(() => of(null)),
+      );
+    }
+
     const group = this._groups().find(g => g.id === groupId);
-    if (!group) return false;
-    const newList = group.miembrosList.filter(m => m !== memberIdentifier);
-    if (newList.length === group.miembrosList.length) return false;
-    const updated = this._groups().map(g =>
-      g.id === groupId ? { ...g, miembrosList: newList, miembros: newList.length } : g
-    );
-    this.persist(updated);
-    return true;
+    if (!group) return of(null);
+    const identifier = email.trim().toLowerCase();
+    const newList = group.miembrosList.filter(m => m !== identifier);
+    if (newList.length === group.miembrosList.length) return of(null);
+    const updated: Group = { ...group, miembrosList: newList, miembros: newList.length };
+    const next = this._groups().map(g => g.id === groupId ? updated : g);
+    this.persist(next);
+    return of(updated);
   }
 }

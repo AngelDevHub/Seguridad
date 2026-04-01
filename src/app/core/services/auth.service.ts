@@ -33,6 +33,8 @@ export interface AppUser {
   // Campos adicionales del backend (opcionales para retrocompatibilidad)
   id?: string;
   username?: string;
+  fechaInicio?: string;
+  fechaNacimiento?: string;
 }
 
 const STORAGE_KEY     = 'users';
@@ -106,6 +108,11 @@ export class AuthService {
    * Registro REAL contra POST /users/auth/register del Gateway.
    */
   registerWithBackend(userData: any): Observable<any> {
+    const edadNum = Number(userData.edad);
+    const fechaNacimiento = Number.isFinite(edadNum) && edadNum > 0
+      ? this.birthDateFromAge(edadNum)
+      : undefined;
+
     const payload = {
       nombre_completo: userData.nombreCompleto,
       direccion: userData.direccion,
@@ -113,13 +120,33 @@ export class AuthService {
       username: userData.usuario,
       email: userData.email,
       password: userData.contrasena,
-      // No incluimos edad porque backend no la soporta actualmente, ni tampoco confirmarContrasena.
+      fecha_nacimiento: fechaNacimiento,
     };
 
     return this.http.post(`${environment.apiUrl}/users/auth/register`, payload);
   }
 
+  private computeAge(fechaNacimiento?: string): number | undefined {
+    if (!fechaNacimiento) return undefined;
+    const d = new Date(fechaNacimiento);
+    if (Number.isNaN(d.getTime())) return undefined;
+    const now = new Date();
+    let age = now.getFullYear() - d.getFullYear();
+    const m = now.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+    return age >= 0 ? age : undefined;
+  }
+
+  private birthDateFromAge(edad: number): string {
+    const now = new Date();
+    const birth = new Date(now.getFullYear() - edad, now.getMonth(), now.getDate());
+    return birth.toISOString().slice(0, 10);
+  }
+
   private mapBackendUser(u: any): AppUser {
+    const fechaNacimiento = u.fecha_nacimiento ?? u.fechaNacimiento ?? undefined;
+    const edad = u.edad ?? this.computeAge(fechaNacimiento);
+    const fechaInicio = u.fecha_inicio ?? u.fechaInicio ?? undefined;
     return {
       id: u.id,
       email: u.email,
@@ -129,9 +156,36 @@ export class AuthService {
       username: u.username ?? u.usuario,
       telefono: u.telefono ?? undefined,
       direccion: u.direccion ?? undefined,
+      edad: typeof edad === 'number' ? edad : undefined,
       permissions: u.permissions ?? [],
       active: u.activo ?? u.active ?? true,
+      fechaInicio: fechaInicio ? String(fechaInicio) : undefined,
+      fechaNacimiento: fechaNacimiento ? String(fechaNacimiento) : undefined,
     };
+  }
+
+  getUserByIdWithBackend(id: string): Observable<AppUser | null> {
+    return this.http.get<ApiResponse<any>>(`${environment.apiUrl}/users/${id}`).pipe(
+      map((r) => (r.success ? this.mapBackendUser(r.data) : null)),
+      tap((u) => {
+        if (!u) return;
+        localStorage.setItem(
+          environment.currentUserKey,
+          JSON.stringify({
+            id: u.id,
+            nombre_completo: u.nombreCompleto,
+            username: u.usuario ?? u.username,
+            email: u.email,
+            permissions: u.permissions ?? [],
+            telefono: u.telefono ?? '',
+            direccion: u.direccion ?? '',
+            fecha_inicio: u.fechaInicio ?? null,
+            fecha_nacimiento: u.fechaNacimiento ?? null,
+          }),
+        );
+      }),
+      catchError(() => of(null)),
+    );
   }
 
   listUsersWithBackend(): Observable<AppUser[]> {
@@ -162,7 +216,11 @@ export class AuthService {
     const payload: any = {};
     if (data.nombreCompleto !== undefined) payload.nombre_completo = data.nombreCompleto;
     if (data.email !== undefined) payload.email = data.email;
+    if (data.usuario !== undefined) payload.username = data.usuario;
     if (data.username !== undefined) payload.username = data.username;
+    if (data.telefono !== undefined) payload.telefono = data.telefono;
+    if (data.direccion !== undefined) payload.direccion = data.direccion;
+    if (data.edad !== undefined && Number.isFinite(Number(data.edad))) payload.fecha_nacimiento = this.birthDateFromAge(Number(data.edad));
     if (data.password !== undefined && String(data.password).trim()) payload.password = data.password;
     if (data.active !== undefined) payload.activo = data.active;
     if (data.permissions !== undefined) payload.permissions = data.permissions;
@@ -208,15 +266,23 @@ export class AuthService {
     if (backendUser) {
       try {
         const parsed = JSON.parse(backendUser);
+        const fechaNacimiento = parsed.fecha_nacimiento ?? undefined;
+        const edad = this.computeAge(fechaNacimiento);
         // Mapear al formato AppUser para compatibilidad
         return {
           id:             parsed.id,
           email:          parsed.email,
           password:       '',
           nombreCompleto: parsed.nombre_completo,
+          usuario:        parsed.username,
           username:       parsed.username,
+          telefono:       parsed.telefono ?? undefined,
+          direccion:      parsed.direccion ?? undefined,
+          edad:           typeof edad === 'number' ? edad : undefined,
           permissions:    parsed.permissions ?? [],
           active:         true,
+          fechaInicio:    parsed.fecha_inicio ?? undefined,
+          fechaNacimiento: parsed.fecha_nacimiento ?? undefined,
         };
       } catch { /* fallback al mock */ }
     }
