@@ -105,10 +105,17 @@ export class TicketDialogComponent {
   open(ticket: Ticket | null, mode: DialogMode, groupId: string): void {
     this.mode.set(mode);
     this.groupId.set(groupId);
-    this.currentTicket.set(ticket);
     this.nuevoComentario = '';
-    this.buildForm(ticket);
     this.visible.set(true);
+    this.currentTicket.set(ticket);
+    this.buildForm(ticket);
+    if (ticket && this.authService.isBackendMode() && this.authService.isLogged()) {
+      this.ticketService.fetchByIdFromBackend(ticket.id).subscribe((fresh) => {
+        if (!fresh) return;
+        this.currentTicket.set(fresh);
+        this.buildForm(fresh);
+      });
+    }
   }
 
   close(): void { this.visible.set(false); }
@@ -158,16 +165,27 @@ export class TicketDialogComponent {
       }, usuario);
       this.messageService.add({ severity: 'success', summary: 'Ticket creado', detail: `"${val.titulo}" creado.`, life: 3000 });
     } else if (this.mode() === 'edit' && this.currentTicket()) {
-      const changes: any = { estado: val.estado };
-      // El creador también puede editar el resto
+      const ticketId = this.currentTicket()!.id;
+      const prevStatus = this.currentTicket()!.estado;
+      const nextStatus = val.estado as TicketStatus;
+
       if (this.isCreator()) {
-        Object.assign(changes, {
-          titulo: val.titulo, descripcion: val.descripcion,
-          prioridad: val.prioridad, asignadoA: val.asignadoA,
+        const changes: any = {
+          titulo: val.titulo,
+          descripcion: val.descripcion,
+          prioridad: val.prioridad,
+          asignadoA: val.asignadoA,
           fechaLimite: new Date(val.fechaLimite).toISOString(),
-        });
+        };
+        this.ticketService.update(ticketId, changes, usuario);
+        if (nextStatus !== prevStatus) {
+          this.ticketService.changeStatus(ticketId, nextStatus, usuario);
+        }
+      } else {
+        if (nextStatus !== prevStatus) {
+          this.ticketService.changeStatus(ticketId, nextStatus, usuario);
+        }
       }
-      this.ticketService.update(this.currentTicket()!.id, changes, usuario);
       this.messageService.add({ severity: 'success', summary: 'Ticket actualizado', detail: 'Cambios guardados.', life: 3000 });
     }
     this.close();

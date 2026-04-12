@@ -1,9 +1,10 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { catchError, of } from 'rxjs';
+import { catchError, map, of, tap, Observable } from 'rxjs';
 import { Ticket, TicketStatus, TicketComment, HistorialCambio } from '../models/ticket.model';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api.model';
+import { AuthService } from './auth.service';
 
 const STORAGE_KEY = 'tickets';
 
@@ -16,11 +17,12 @@ function futureDate(days: number): string { return new Date(Date.now() + days * 
 @Injectable({ providedIn: 'root' })
 export class TicketService {
   private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
   private readonly _tickets = signal<Ticket[]>(this.load());
   readonly tickets = this._tickets.asReadonly();
 
   constructor() {
-    if (localStorage.getItem(environment.jwtKey)) {
+    if (this.auth.isBackendMode() && this.auth.isLogged()) {
       this.refreshAll();
     }
   }
@@ -95,10 +97,11 @@ export class TicketService {
   }
 
   refreshAll(): void {
+    if (!this.auth.isBackendMode() || !this.auth.isLogged()) return;
     this.http.get<ApiResponse<Ticket[]>>(`${environment.apiUrl}/tickets`).pipe(
       catchError(() => of(null)),
     ).subscribe((res) => {
-      if (!res || !res.success) return;
+      if (!res || !res.data) return;
       const list = (res.data ?? []).map((t: any) => ({
         ...t,
         comentarios: t.comentarios ?? [],
@@ -106,6 +109,22 @@ export class TicketService {
       })) as Ticket[];
       this.persist(list);
     });
+  }
+
+  fetchByIdFromBackend(id: string): Observable<Ticket | null> {
+    if (!this.auth.isBackendMode() || !this.auth.isLogged()) return of(null);
+    const ticketId = String(id ?? '').trim();
+    if (!ticketId) return of(null);
+    return this.http.get<ApiResponse<Ticket>>(`${environment.apiUrl}/tickets/${ticketId}`).pipe(
+      map((r) => (r && r.data ? (r.data as any as Ticket) : null)),
+      tap((t) => {
+        if (!t) return;
+        const next = [...this._tickets().filter((x) => x.id !== t.id), t]
+          .sort((a, b) => b.fechaCreacion.localeCompare(a.fechaCreacion));
+        this.persist(next);
+      }),
+      catchError(() => of(null)),
+    );
   }
 
   // ── Queries ───────────────────────────────────────────────────
@@ -129,7 +148,7 @@ export class TicketService {
 
   // ── CRUD ──────────────────────────────────────────────────────
   add(data: Omit<Ticket, 'id' | 'fechaCreacion' | 'comentarios' | 'historialCambios'>, usuario = 'Sistema'): Ticket {
-    if (localStorage.getItem(environment.jwtKey)) {
+    if (this.auth.isBackendMode() && this.auth.isLogged()) {
       const payload: any = {
         titulo: data.titulo,
         descripcion: data.descripcion,
@@ -142,7 +161,7 @@ export class TicketService {
       this.http.post<ApiResponse<Ticket>>(`${environment.apiUrl}/tickets`, payload).pipe(
         catchError(() => of(null)),
       ).subscribe((res) => {
-        if (!res || !res.success) return;
+        if (!res || !res.data) return;
         const created = res.data as any as Ticket;
         const merged = [...this._tickets().filter((x) => x.id !== created.id), created]
           .sort((a, b) => b.fechaCreacion.localeCompare(a.fechaCreacion));
@@ -173,7 +192,7 @@ export class TicketService {
   }
 
   update(id: string, changes: Partial<Omit<Ticket, 'id' | 'groupId' | 'fechaCreacion' | 'comentarios' | 'historialCambios'>>, usuario = 'Sistema'): boolean {
-    if (localStorage.getItem(environment.jwtKey)) {
+    if (this.auth.isBackendMode() && this.auth.isLogged()) {
       const payload: any = {};
       if (changes.titulo !== undefined) payload.titulo = changes.titulo;
       if (changes.descripcion !== undefined) payload.descripcion = changes.descripcion;
@@ -185,7 +204,7 @@ export class TicketService {
       this.http.patch<ApiResponse<Ticket>>(`${environment.apiUrl}/tickets/${id}`, payload).pipe(
         catchError(() => of(null)),
       ).subscribe((res) => {
-        if (!res || !res.success) return;
+        if (!res || !res.data) return;
         const updated = res.data as any as Ticket;
         const next = this._tickets().map((t) => t.id === id ? updated : t);
         this.persist(next);
@@ -210,11 +229,11 @@ export class TicketService {
   }
 
   delete(id: string): boolean {
-    if (localStorage.getItem(environment.jwtKey)) {
+    if (this.auth.isBackendMode() && this.auth.isLogged()) {
       this.http.delete<ApiResponse<any>>(`${environment.apiUrl}/tickets/${id}`).pipe(
         catchError(() => of(null)),
       ).subscribe((res) => {
-        if (!res || !res.success) return;
+        if (!res) return;
         const filtered = this._tickets().filter(t => t.id !== id);
         this.persist(filtered);
       });
@@ -228,11 +247,11 @@ export class TicketService {
 
   // ── Comentarios ───────────────────────────────────────────────
   addComment(ticketId: string, autor: string, texto: string): boolean {
-    if (localStorage.getItem(environment.jwtKey)) {
+    if (this.auth.isBackendMode() && this.auth.isLogged()) {
       this.http.post<ApiResponse<Ticket>>(`${environment.apiUrl}/tickets/${ticketId}/comments`, { texto }).pipe(
         catchError(() => of(null)),
       ).subscribe((res) => {
-        if (!res || !res.success) return;
+        if (!res || !res.data) return;
         const updated = res.data as any as Ticket;
         const next = this._tickets().map((t) => t.id === ticketId ? updated : t);
         this.persist(next);
@@ -252,6 +271,17 @@ export class TicketService {
 
   // ── Cambio rápido de estado ───────────────────────────────────
   changeStatus(ticketId: string, newStatus: TicketStatus, usuario = 'Sistema'): boolean {
+    if (this.auth.isBackendMode() && this.auth.isLogged()) {
+      this.http.post<ApiResponse<Ticket>>(`${environment.apiUrl}/tickets/${ticketId}/move`, { toStatus: newStatus }).pipe(
+        catchError(() => of(null)),
+      ).subscribe((res) => {
+        if (!res || !res.data) return;
+        const updated = res.data as any as Ticket;
+        const next = this._tickets().map((t) => t.id === ticketId ? updated : t);
+        this.persist(next);
+      });
+      return true;
+    }
     return this.update(ticketId, { estado: newStatus }, usuario);
   }
 }

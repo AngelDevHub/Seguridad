@@ -6,11 +6,11 @@ import { PermissionsService } from '../services/permissions.service';
  * posee el permiso (o alguno de los permisos) indicado.
  *
  * Uso:
- *   <button *ifHasPermission="'tickets:crear'">Crear</button>
- *   <div *ifHasPermission="['usuarios:crear','usuarios:editar']">Admin</div>
+ *   <button *appHasPermission="'tickets:crear'">Crear</button>
+ *   <div *appHasPermission="['usuarios:crear','usuarios:editar']">Admin</div>
  */
 @Directive({
-  selector: '[ifHasPermission]',
+  selector: '[appHasPermission]',
   standalone: true,
 })
 export class IfHasPermissionDirective {
@@ -23,7 +23,7 @@ export class IfHasPermissionDirective {
   private hasView = false;
 
   @Input({ required: true })
-  set ifHasPermission(value: string | string[]) {
+  set appHasPermission(value: string | string[]) {
     this.requires.set(value);
   }
 

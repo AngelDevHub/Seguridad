@@ -21,7 +21,6 @@ import { environment } from '../../../environments/environment';
 import { AppUser } from '../../core/services/auth.service';
 
 export type UserProfile = AppUser & {
-  rol?: string;
   fechaRegistro?: string;
 };
 
@@ -75,15 +74,13 @@ export class UserComponent implements OnInit {
       telefono: '',
       direccion: '',
       edad: 0,
-      rol: 'Sin rol',
       fechaRegistro: 'N/A',
     };
     this.profile.set(this.withDerivedFields(initial));
     this.buildForm();
 
-    const current = this.profile();
-    if (current?.id && this.authService.getToken()) {
-      this.authService.getUserByIdWithBackend(current.id).subscribe((fresh) => {
+    if (this.authService.isBackendMode() && this.authService.isLogged()) {
+      this.authService.getMeWithBackend().subscribe((fresh) => {
         if (!fresh) return;
         this.profile.set(this.withDerivedFields({ ...this.profile(), ...fresh }));
         if (!this.isEditing()) this.buildForm();
@@ -93,9 +90,6 @@ export class UserComponent implements OnInit {
 
   private withDerivedFields(p: UserProfile): UserProfile {
     const permissions = p.permissions ?? [];
-    const isAdmin = permissions.includes('usuarios:asignarPermisos') || permissions.some((x) => String(x).startsWith('usuarios:'));
-    const rol = p.rol ?? (isAdmin ? 'Administrador' : permissions.length ? 'Usuario' : 'Sin rol');
-
     const fechaRaw = p.fechaRegistro ?? p.fechaInicio ?? '';
     const fechaRegistro = fechaRaw ? String(fechaRaw).slice(0, 10) : 'N/A';
 
@@ -107,7 +101,6 @@ export class UserComponent implements OnInit {
       telefono: p.telefono ?? '',
       direccion: p.direccion ?? '',
       edad,
-      rol,
       fechaRegistro,
     };
   }

@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { TableModule } from 'primeng/table';
@@ -17,10 +17,13 @@ import { ChipModule } from 'primeng/chip';
 import { DividerModule } from 'primeng/divider';
 import { CardModule } from 'primeng/card';
 import { TooltipModule } from 'primeng/tooltip';
+import { CheckboxModule } from 'primeng/checkbox';
+import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { MessageService, ConfirmationService } from 'primeng/api';
 import { GroupCrudService, Group } from '../../core/services/group-crud.service';
 import { IfHasPermissionDirective } from '../../core/directives/if-has-permission.directive';
 import { AuthService } from '../../core/services/auth.service';
+import { ALL_PERMISSIONS } from '../../core/services/permissions.service';
 
 type TagSeverity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast' | undefined;
 
@@ -32,6 +35,7 @@ type TagSeverity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contr
     TableModule, ButtonModule, DialogModule, InputTextModule, InputNumberModule,
     SelectModule, ToastModule, ConfirmDialogModule, TagModule, IconFieldModule,
     InputIconModule, ToolbarModule, ChipModule, DividerModule, CardModule, TooltipModule,
+    CheckboxModule, ProgressSpinnerModule,
     IfHasPermissionDirective,
   ],
   templateUrl: './group.component.html',
@@ -54,6 +58,27 @@ export class GroupComponent implements OnInit {
   selectedGroupRow: Group | null = null;  // used for p-table [(selection)]
   selectedGroup   = signal<Group | null>(null);
   newMemberInput  = '';
+
+  // ── Permisos por grupo (por miembro) ─────────────────────────────────────
+  permDialogVisible  = signal(false);
+  permDialogMember   = signal<string>('');     // email del miembro seleccionado
+  permDialogLoading  = signal(false);
+  permDialogSaving   = signal(false);
+  // Permisos activos del miembro en el grupo (seleccionados con checkbox)
+  permDialogSelected = signal<string[]>([]);
+
+  // Todos los permisos que se pueden asignar dentro de un grupo
+  readonly GROUP_ASSIGNABLE_PERMS = [
+    { key: 'tickets:crear',    label: 'Crear tickets',    icon: 'pi-plus-circle' },
+    { key: 'tickets:editar',   label: 'Editar tickets',   icon: 'pi-pencil' },
+    { key: 'tickets:ver',      label: 'Ver tickets',      icon: 'pi-eye' },
+    { key: 'tickets:asignar',  label: 'Asignar tickets',  icon: 'pi-user-edit' },
+    { key: 'tickets:eliminar', label: 'Eliminar tickets', icon: 'pi-trash' },
+    { key: 'tickets:move',     label: 'Mover tickets (Kanban)', icon: 'pi-arrows-alt' },
+    { key: 'grupos:invitar',   label: 'Invitar miembros', icon: 'pi-user-plus' },
+    { key: 'grupos:editar',    label: 'Editar este grupo',icon: 'pi-file-edit' },
+    { key: 'grupos:eliminar',  label: 'Eliminar grupo',   icon: 'pi-times-circle' },
+  ];
 
   nivelOptions = [
     { label: 'Básico',     value: 'Básico' },
@@ -95,6 +120,14 @@ export class GroupComponent implements OnInit {
     const formVal = this.form.value;
 
     if (this.isEditMode()) {
+      const currentUserId = this.authService.getCurrentUser()?.id ?? '';
+      const creatorId = this.selectedGroup()?._creadorId ?? '';
+      const isAdmin = (this.authService.getCurrentUser()?.permissions ?? []).includes('usuarios:asignarPermisos');
+      if (!isAdmin && (!creatorId || creatorId !== currentUserId)) {
+        this.isSaving.set(false);
+        this.messageService.add({ severity: 'warn', summary: 'Sin permisos', detail: 'Solo el creador puede editar este grupo.', life: 3500 });
+        return;
+      }
       this.groupService.update(this.editingId()!, {
         nombre: formVal.nombre,
         categoria: formVal.categoria,
@@ -132,6 +165,13 @@ export class GroupComponent implements OnInit {
       icon: 'pi pi-exclamation-triangle', acceptLabel: 'Sí, eliminar', rejectLabel: 'Cancelar',
       acceptButtonStyleClass: 'p-button-danger',
       accept: () => {
+        const currentUserId = this.authService.getCurrentUser()?.id ?? '';
+        const creatorId = (this.groupService.getById(g.id)?._creadorId) ?? this.selectedGroup()?._creadorId ?? '';
+        const isAdmin = (this.authService.getCurrentUser()?.permissions ?? []).includes('usuarios:asignarPermisos');
+        if (!isAdmin && (!creatorId || creatorId !== currentUserId)) {
+          this.messageService.add({ severity: 'warn', summary: 'Sin permisos', detail: 'Solo el creador puede eliminar este grupo.', life: 3500 });
+          return;
+        }
         if (this.selectedGroup()?.id === g.id) this.selectedGroup.set(null);
         this.groupService.delete(g.id).subscribe((ok) => {
           this.messageService.add(ok
@@ -145,7 +185,19 @@ export class GroupComponent implements OnInit {
   // ── Member management ──────────────────────────────────────────
   selectGroup(g: Group | Group[] | undefined): void {
     if (!g || Array.isArray(g)) return;
-    this.selectedGroup.set(this.groupService.getById(g.id) ?? g);
+    const local = this.groupService.getById(g.id) ?? g;
+    this.selectedGroup.set(local);
+    if (this.authService.isBackendMode() && this.authService.isLogged()) {
+      this.groupService.fetchByIdFromBackend(g.id).subscribe((fresh) => {
+        if (fresh) {
+          this.selectedGroup.set(fresh);
+          return;
+        }
+        this.groupService.removeFromCache(g.id);
+        if (this.selectedGroup()?.id === g.id) this.selectedGroup.set(null);
+        this.messageService.add({ severity: 'warn', summary: 'Grupo no disponible', detail: 'El grupo ya no existe o ya no tienes acceso.', life: 3500 });
+      });
+    }
   }
   clearSelection(): void { this.selectedGroup.set(null); }
 
@@ -157,8 +209,13 @@ export class GroupComponent implements OnInit {
     this.groupService.addMember(id, this.newMemberInput.trim()).subscribe((updated) => {
       if (updated) {
         this.selectedGroup.set(updated);
+        if (this.authService.isBackendMode() && this.authService.isLogged()) {
+          this.groupService.fetchByIdFromBackend(id).subscribe((fresh) => {
+            if (fresh) this.selectedGroup.set(fresh);
+          });
+        }
         this.newMemberInput = '';
-        this.messageService.add({ severity: 'success', summary: 'Miembro agregado', life: 2500 });
+        this.messageService.add({ severity: 'success', summary: 'Miembro agregado / invitación enviada', life: 2500 });
       } else {
         this.messageService.add({ severity: 'warn', summary: 'Ya existe o inválido', life: 3000 });
       }
@@ -171,11 +228,91 @@ export class GroupComponent implements OnInit {
     this.groupService.removeMember(id, identifier).subscribe((updated) => {
       if (updated) {
         this.selectedGroup.set(updated);
+        if (this.authService.isBackendMode() && this.authService.isLogged()) {
+          this.groupService.fetchByIdFromBackend(id).subscribe((fresh) => {
+            if (fresh) this.selectedGroup.set(fresh);
+          });
+        }
         this.messageService.add({ severity: 'info', summary: 'Miembro eliminado', life: 2500 });
       } else {
         this.messageService.add({ severity: 'warn', summary: 'No se pudo eliminar', life: 2500 });
       }
     });
+  }
+
+  // ── Permisos por grupo ────────────────────────────────────────────────────
+
+  /** Abre el diálogo de permisos para un miembro específico del grupo */
+  openPermissionsDialog(memberEmail: string): void {
+    const group = this.selectedGroup();
+    if (!group) return;
+
+    this.permDialogMember.set(memberEmail);
+    this.permDialogSelected.set([]);
+    this.permDialogVisible.set(true);
+    this.permDialogLoading.set(true);
+
+    // Buscar el userId del miembro por su email para llamar la API
+    this.authService.listUsersWithBackend().subscribe((users) => {
+      const memberUser = users.find(u => u.email?.toLowerCase() === memberEmail.toLowerCase());
+      if (!memberUser?.id) {
+        this.permDialogLoading.set(false);
+        this.messageService.add({ severity: 'warn', summary: 'Usuario no encontrado', detail: `No se encontró el usuario "${memberEmail}" en el sistema.`, life: 4000 });
+        this.permDialogVisible.set(false);
+        return;
+      }
+
+      // Cargar los permisos actuales del miembro en este grupo específico
+      this.authService.getUserGroupPermissions(memberUser.id, group.id).subscribe((currentPerms) => {
+        this.permDialogSelected.set(currentPerms ?? []);
+        this.permDialogLoading.set(false);
+        // Guardar el userId para usarlo al salvar
+        this._permDialogUserId = memberUser.id!;
+      });
+    });
+  }
+
+  private _permDialogUserId = '';
+
+  /** Persiste los permisos seleccionados en el backend */
+  saveGroupPermissions(): void {
+    const group = this.selectedGroup();
+    if (!group || !this._permDialogUserId) return;
+
+    this.permDialogSaving.set(true);
+    this.authService.setUserGroupPermissions(
+      this._permDialogUserId,
+      group.id,
+      this.permDialogSelected()
+    ).subscribe({
+      next: (saved) => {
+        this.permDialogSaving.set(false);
+        this.permDialogVisible.set(false);
+        this.messageService.add({
+          severity: 'success',
+          summary: 'Permisos guardados',
+          detail: `Permisos de "${this.permDialogMember()}" en "${group.nombre}" actualizados.`,
+          life: 4000,
+        });
+      },
+      error: () => {
+        this.permDialogSaving.set(false);
+        this.messageService.add({ severity: 'error', summary: 'Error', detail: 'No se pudieron guardar los permisos.', life: 4000 });
+      }
+    });
+  }
+
+  togglePermission(permKey: string): void {
+    const current = this.permDialogSelected();
+    if (current.includes(permKey)) {
+      this.permDialogSelected.set(current.filter(p => p !== permKey));
+    } else {
+      this.permDialogSelected.set([...current, permKey]);
+    }
+  }
+
+  isPermSelected(permKey: string): boolean {
+    return this.permDialogSelected().includes(permKey);
   }
 
   // ── Helpers ───────────────────────────────────────────────────

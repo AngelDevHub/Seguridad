@@ -43,14 +43,14 @@
             </a>
 
             <!-- Grupos — requiere grupos:ver -->
-            <a *ifHasPermission="'grupos:ver'" routerLink="/group" [style]="navStyle('group', false)"
+            <a *appHasPermission="'grupos:ver'" routerLink="/group" [style]="navStyle('group', false)"
                 [pTooltip]="isCollapsed() ? 'Grupos' : ''" tooltipPosition="right">
                 <i class="pi pi-users text-lg" style="min-width:20px; text-align:center"></i>
                 @if (!isCollapsed()) { <span>Grupos</span> }
             </a>
 
             <!-- Administración de Usuarios — requiere usuarios:ver -->
-            <a *ifHasPermission="'usuarios:ver'" routerLink="/admin-users" [style]="navStyle('admin-users', false)"
+            <a *appHasPermission="'usuarios:ver'" routerLink="/admin-users" [style]="navStyle('admin-users', false)"
                 [pTooltip]="isCollapsed() ? 'Admin Usuarios' : ''" tooltipPosition="right">
                 <i class="pi pi-shield text-lg" style="min-width:20px; text-align:center"></i>
                 @if (!isCollapsed()) { <span>Admin Usuarios</span> }

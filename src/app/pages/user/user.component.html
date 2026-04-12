@@ -32,7 +32,6 @@
         <div class="flex flex-column gap-1">
             <span class="text-2xl font-bold text-900">{{ p.nombreCompleto }}</span>
             <span class="text-500 text-sm">&#64;{{ p.usuario }}</span>
-            <p-tag [value]="p.rol" severity="info" [rounded]="true" />
         </div>
     </div>
 
@@ -101,8 +100,16 @@
             <div class="col-12 md:col-6">
                 <div class="flex flex-column gap-1">
                     <small class="text-500 font-semibold uppercase"
-                        style="font-size:0.65rem; letter-spacing:.08em">Rol</small>
-                    <span class="text-900 font-medium"><i class="pi pi-shield mr-2 text-primary"></i>{{ p.rol }}</span>
+                        style="font-size:0.65rem; letter-spacing:.08em">Permisos globales</small>
+                    @if (p.permissions.length > 0) {
+                    <div class="flex flex-wrap gap-1">
+                        @for (perm of p.permissions; track perm) {
+                        <p-tag [value]="perm" severity="secondary" [rounded]="true" />
+                        }
+                    </div>
+                    } @else {
+                    <span class="text-500 text-sm">Sin permisos asignados.</span>
+                    }
                 </div>
             </div>
             <div class="col-12 md:col-6">

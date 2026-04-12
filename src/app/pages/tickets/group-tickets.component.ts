@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, ViewChild } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { TableModule } from 'primeng/table';
@@ -17,6 +17,7 @@ import { MessageService, ConfirmationService } from 'primeng/api';
 import { GroupCrudService, Group } from '../../core/services/group-crud.service';
 import { TicketService } from '../../core/services/ticket.service';
 import { AuthService } from '../../core/services/auth.service';
+import { PermissionsService } from '../../core/services/permissions.service';
 import { Ticket, TicketStatus, TicketPriority } from '../../core/models/ticket.model';
 import { TicketDialogComponent } from './ticket-dialog.component';
 import { IfHasPermissionDirective } from '../../core/directives/if-has-permission.directive';
@@ -35,12 +36,13 @@ type Severity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast
   ],
   templateUrl: './group-tickets.component.html',
 })
-export class GroupTicketsComponent implements OnInit {
+export class GroupTicketsComponent implements OnInit, OnDestroy {
   private readonly route          = inject(ActivatedRoute);
   private readonly router         = inject(Router);
   private readonly groupService   = inject(GroupCrudService);
   private readonly ticketService  = inject(TicketService);
   private readonly authService    = inject(AuthService);
+  readonly permsSvc       = inject(PermissionsService);
   private readonly messageService = inject(MessageService);
   private readonly confirmService = inject(ConfirmationService);
 
@@ -88,8 +90,16 @@ export class GroupTicketsComponent implements OnInit {
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id') ?? '';
     this.groupId.set(id);
+    this.permsSvc.setActiveGroup(id);
+    this.authService.getMyGroupPermissions(id).subscribe((perms) => {
+      this.permsSvc.setGroupPermissions(id, perms);
+    });
     this.group.set(this.groupService.getById(id) ?? null);
     if (!this.group()) this.router.navigate(['/group']);
+  }
+
+  ngOnDestroy(): void {
+    this.permsSvc.clearActiveGroup();
   }
 
   ticketsByStatus(status: TicketStatus): Ticket[] {
@@ -98,17 +108,53 @@ export class GroupTicketsComponent implements OnInit {
     return this.quickFilters ? this.quickFilters.applyTo(base) : base;
   }
 
-  /** CDK Drag & Drop — mover ticket a otra columna */
+  /** CDK Drag & Drop — mover ticket a otra columna (doble validación) */
   onTicketDrop(event: CdkDragDrop<Ticket[]>, targetStatus: TicketStatus): void {
     if (event.previousContainer === event.container) {
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
-    } else {
-      const ticket: Ticket = event.previousContainer.data[event.previousIndex];
-      transferArrayItem(event.previousContainer.data, event.container.data, event.previousIndex, event.currentIndex);
-      const usuario = this.currentUserEmail();
-      this.ticketService.changeStatus(ticket.id, targetStatus, usuario);
-      this.messageService.add({ severity: 'info', summary: `Estado → ${targetStatus}`, detail: ticket.titulo, life: 2500 });
+      return;
     }
+
+    const ticket: Ticket = event.previousContainer.data[event.previousIndex];
+    const currentUser    = this.currentUserEmail();
+
+    // ── Validación 1: el usuario debe tener el permiso tickets:move ─────────
+    if (!this.permsSvc.hasPermission('tickets:move')) {
+      this.messageService.add({
+        severity: 'error',
+        summary: 'Sin permiso',
+        detail: 'No tienes el permiso “tickets:move” para mover tickets.',
+        life: 4000,
+      });
+      return; // NO mover el ticket
+    }
+
+    // ── Validación 2: el ticket debe estar asignado al usuario actual ────────
+    const asignadoA = ticket.asignadoA ?? '';
+    if (!asignadoA || asignadoA !== currentUser) {
+      this.messageService.add({
+        severity: 'warn',
+        summary: 'Ticket no asignado a ti',
+        detail: `Solo puedes mover tickets asignados a tu cuenta.`,
+        life: 4000,
+      });
+      return; // NO mover el ticket
+    }
+
+    // ── Ambas validaciones superadas — proceder con el movimiento ─────────
+    transferArrayItem(
+      event.previousContainer.data,
+      event.container.data,
+      event.previousIndex,
+      event.currentIndex,
+    );
+    this.ticketService.changeStatus(ticket.id, targetStatus, currentUser);
+    this.messageService.add({
+      severity: 'info',
+      summary: `Estado → ${targetStatus}`,
+      detail: ticket.titulo,
+      life: 2500,
+    });
   }
 
   newTicket():             void { this.ticketDialog.open(null,   'create', this.groupId()); }

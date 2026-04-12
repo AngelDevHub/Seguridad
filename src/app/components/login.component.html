@@ -1,5 +1,18 @@
+<p-toast position="top-center"></p-toast>
 <div class="flex justify-content-center align-items-center h-screen">
-  <p-card header="Iniciar sesión" styleClass="w-25rem">
+  <p-card styleClass="w-25rem pt-3 shadow-4">
+
+    <!-- Header / Logo con evento (Easter egg) -->
+    <ng-template #header>
+      <div class="flex flex-column align-items-center justify-content-center pt-4" style="user-select: none;">
+        <!-- El div interno funge como el "logo" que espera de los 5 clics -->
+        <div (click)="onLogoClick()" class="cursor-pointer flex align-items-center justify-content-center border-circle bg-primary-50 text-primary" style="width: 60px; height: 60px;">
+          <i class="pi pi-box text-3xl"></i>
+        </div>
+        <h1 class="text-2xl font-bold mt-3 mb-0 text-900 text-center">ERP System</h1>
+        <span class="text-500 text-sm mt-1 text-center">Inicia sesión en tu cuenta</span>
+      </div>
+    </ng-template>
 
     <form [formGroup]="form" (ngSubmit)="login()">
 

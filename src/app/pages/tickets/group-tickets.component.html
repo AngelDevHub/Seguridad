@@ -24,7 +24,7 @@
                 <p-button icon="pi pi-list" label="Lista" [severity]="viewMode() === 'lista' ? 'primary' : 'secondary'"
                     [outlined]="viewMode() !== 'lista'" (onClick)="viewMode.set('lista')" styleClass="border-noround" />
             </div>
-            <p-button *ifHasPermission="'tickets:crear'" label="Nuevo Ticket" icon="pi pi-plus"
+            <p-button *appHasPermission="'tickets:crear'" label="Nuevo Ticket" icon="pi pi-plus"
                 (onClick)="newTicket()" />
         </div>
     </ng-template>
@@ -61,7 +61,9 @@
 
             <!-- Ticket cards -->
             @for (t of ticketsByStatus(col.status); track t.id) {
-            <div cdkDrag class="surface-0 border-1 surface-border border-round p-3 cursor-grab"
+            <div cdkDrag [cdkDragDisabled]="!permsSvc.hasPermission('tickets:move')" class="surface-0 border-1 surface-border border-round p-3"
+                [class.cursor-grab]="permsSvc.hasPermission('tickets:move')"
+                [class.cursor-pointer]="!permsSvc.hasPermission('tickets:move')"
                 style="transition: box-shadow .15s ease" (click)="viewTicket(t)">
                 <!-- Drag placeholder -->
                 <div *cdkDragPlaceholder class="border-2 border-dashed border-primary border-round"
@@ -87,9 +89,9 @@
                     <div class="text-400 text-xs"><i class="pi pi-clock mr-1"></i>Creado: {{ formatDate(t.fechaCreacion)
                         }}</div>
                     <div class="flex gap-1" (click)="$event.stopPropagation()">
-                        <p-button *ifHasPermission="'tickets:editar'" icon="pi pi-pencil" [text]="true"
+                        <p-button *appHasPermission="'tickets:editar'" icon="pi pi-pencil" [text]="true"
                             severity="secondary" size="small" (onClick)="editTicket(t)" pTooltip="Editar" />
-                        <p-button *ifHasPermission="'tickets:eliminar'" icon="pi pi-trash" [text]="true"
+                        <p-button *appHasPermission="'tickets:eliminar'" icon="pi pi-trash" [text]="true"
                             severity="danger" size="small" (onClick)="confirmDelete(t)" pTooltip="Eliminar" />
                     </div>
                 </div>
@@ -150,11 +152,11 @@
             <td>{{ formatDate(t.fechaLimite) }}</td>
             <td>
                 <div class="flex justify-content-center gap-1">
-                    <p-button *ifHasPermission="'tickets:ver'" icon="pi pi-eye" severity="info" [outlined]="true"
+                    <p-button *appHasPermission="'tickets:ver'" icon="pi pi-eye" severity="info" [outlined]="true"
                         size="small" (onClick)="viewTicket(t)" pTooltip="Ver" />
-                    <p-button *ifHasPermission="'tickets:editar'" icon="pi pi-pencil" severity="secondary"
+                    <p-button *appHasPermission="'tickets:editar'" icon="pi pi-pencil" severity="secondary"
                         [outlined]="true" size="small" (onClick)="editTicket(t)" pTooltip="Editar" />
-                    <p-button *ifHasPermission="'tickets:eliminar'" icon="pi pi-trash" severity="danger"
+                    <p-button *appHasPermission="'tickets:eliminar'" icon="pi pi-trash" severity="danger"
                         [outlined]="true" size="small" (onClick)="confirmDelete(t)" pTooltip="Eliminar" />
                 </div>
             </td>

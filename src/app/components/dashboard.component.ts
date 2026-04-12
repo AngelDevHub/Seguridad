@@ -8,6 +8,7 @@ import { ToolbarModule } from 'primeng/toolbar';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { DividerModule } from 'primeng/divider';
 import { ChipModule } from 'primeng/chip';
+import { ChartModule } from 'primeng/chart';
 import { MessageService } from 'primeng/api';
 import { TicketService } from '../core/services/ticket.service';
 import { GroupCrudService } from '../core/services/group-crud.service';
@@ -19,7 +20,7 @@ type Severity = 'success' | 'secondary' | 'info' | 'warn' | 'danger' | 'contrast
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CardModule, ButtonModule, TagModule, TableModule, ToolbarModule, ProgressBarModule, DividerModule, ChipModule],
+  imports: [CardModule, ButtonModule, TagModule, TableModule, ToolbarModule, ProgressBarModule, DividerModule, ChipModule, ChartModule],
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent {
@@ -56,6 +57,65 @@ export class DashboardComponent {
       g.miembrosList?.some((m: string) => m === email) || g.autor === email
     );
   });
+
+  // ── Datos para gráfico de estados (donut PrimeNG) ──────────────────────────
+  /** Datos del gráfico reactive: se actualiza cuando cambian los totales */
+  readonly chartData = computed(() => ({
+    labels: ['Pendiente', 'En Progreso', 'Revisión', 'Finalizado', 'Bloqueado'],
+    datasets: [
+      {
+        data: [
+          this.pendientes(),
+          this.enProgreso(),
+          this.revision(),
+          this.finalizados(),
+          this.bloqueados(),
+        ],
+        backgroundColor: [
+          '#6b7280', // Pendiente — gris
+          '#3b82f6', // En Progreso — azul
+          '#f59e0b', // Revisión — ámbar
+          '#22c55e', // Finalizado — verde
+          '#ef4444', // Bloqueado — rojo
+        ],
+        hoverBackgroundColor: [
+          '#4b5563',
+          '#2563eb',
+          '#d97706',
+          '#16a34a',
+          '#dc2626',
+        ],
+        borderWidth: 2,
+        borderColor: 'transparent',
+      },
+    ],
+  }));
+
+  readonly chartOptions = {
+    cutout: '65%',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          usePointStyle: true,
+          pointStyle: 'circle',
+          padding: 16,
+          font: { size: 12 },
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: (ctx: any) => {
+            const total = ctx.dataset.data.reduce((a: number, b: number) => a + b, 0);
+            const pct = total === 0 ? 0 : Math.round((ctx.parsed / total) * 100);
+            return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+          },
+        },
+      },
+    },
+  };
 
   statusSeverity(s: TicketStatus): Severity {
     return ({ 'Pendiente': 'secondary', 'En progreso': 'info', 'Revisión': 'warn', 'Finalizado': 'success' } as any)[s];

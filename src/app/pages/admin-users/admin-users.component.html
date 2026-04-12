@@ -10,7 +10,7 @@
         </div>
     </ng-template>
     <ng-template #end>
-        <p-button *ifHasPermission="'usuarios:crear'" label="Nuevo Usuario" icon="pi pi-user-plus"
+        <p-button *appHasPermission="'usuarios:crear'" label="Nuevo Usuario" icon="pi pi-user-plus"
             (onClick)="openCreate()" />
     </ng-template>
 </p-toolbar>
@@ -62,17 +62,20 @@
             </td>
             <td>
                 <div class="flex justify-content-center gap-1">
-                    <p-button *ifHasPermission="'usuarios:asignarPermisos'" icon="pi pi-key" severity="warn"
+                    <p-button *appHasPermission="'usuarios:asignarPermisos'" icon="pi pi-key" severity="warn"
                         [outlined]="true" size="small" (onClick)="openPermissions(u)" pTooltip="Permisos"
                         tooltipPosition="top" />
-                    <p-button *ifHasPermission="'usuarios:editar'" icon="pi pi-pencil" severity="secondary"
+                    <p-button *appHasPermission="'usuarios:asignarPermisos'" icon="pi pi-sitemap" severity="info"
+                        [outlined]="true" size="small" (onClick)="openGroupPermissions(u)" pTooltip="Permisos por grupo"
+                        tooltipPosition="top" />
+                    <p-button *appHasPermission="'usuarios:editar'" icon="pi pi-pencil" severity="secondary"
                         [outlined]="true" size="small" (onClick)="openEdit(u)" pTooltip="Editar"
                         tooltipPosition="top" />
-                    <p-button *ifHasPermission="'usuarios:editar'" [icon]="u.active ? 'pi pi-eye-slash' : 'pi pi-eye'"
+                    <p-button *appHasPermission="'usuarios:editar'" [icon]="u.active ? 'pi pi-eye-slash' : 'pi pi-eye'"
                         [severity]="u.active ? 'secondary' : 'success'" [outlined]="true" size="small"
                         (onClick)="toggleActive(u)" [pTooltip]="u.active ? 'Desactivar' : 'Activar'"
                         tooltipPosition="top" [disabled]="u.isProtected" />
-                    <p-button *ifHasPermission="'usuarios:eliminar'" icon="pi pi-trash" severity="danger"
+                    <p-button *appHasPermission="'usuarios:eliminar'" icon="pi pi-trash" severity="danger"
                         [outlined]="true" size="small" (onClick)="confirmDelete(u)" pTooltip="Eliminar"
                         tooltipPosition="top" [disabled]="u.isProtected" />
                 </div>
@@ -158,6 +161,48 @@
         <div class="flex justify-content-end gap-2">
             <p-button label="Cancelar" severity="secondary" [outlined]="true" (onClick)="closeDialog()" />
             <p-button label="Guardar permisos" icon="pi pi-key" (onClick)="savePermissions()" />
+        </div>
+    </ng-template>
+</p-dialog>
+
+<!-- ══ Dialog: Permisos por Grupo ══ -->
+<p-dialog header="Permisos por Grupo" [(visible)]="groupPermsDialogVisible" [modal]="true"
+    [style]="{ width: '620px' }" [draggable]="false">
+    <form [formGroup]="groupPermsForm" class="pt-2">
+        <div class="flex flex-column gap-4">
+            <div class="flex justify-content-end">
+                <p-iconfield>
+                    <p-inputicon styleClass="pi pi-search" />
+                    <input pInputText placeholder="Buscar grupo por nombre/categoría..." [(ngModel)]="groupSearchText" [ngModelOptions]="{standalone: true}" (ngModelChange)="groupSearch.set($event)" style="width:320px" />
+                </p-iconfield>
+            </div>
+            <div class="flex flex-column gap-2">
+                <label class="font-semibold text-700 text-sm">Grupo <span class="text-red-500">*</span></label>
+                <p-select formControlName="groupId" [options]="filteredGroupOptions()" optionLabel="label" optionValue="value"
+                    styleClass="w-full" />
+                @if (hasError('groupId','required', groupPermsForm)) { <small class="text-red-500">Requerido.</small> }
+            </div>
+            <div class="flex align-items-center gap-2">
+                <small class="text-600">Estado de membresía del usuario en este grupo:</small>
+                <p-tag [value]="membershipStatus() === 'miembro' ? 'Miembro' : membershipStatus() === 'invitado' ? 'Invitado' : 'No miembro'"
+                       [severity]="membershipSeverity()" [rounded]="true" />
+            </div>
+
+            <div class="flex flex-column gap-2">
+                <label class="font-semibold text-700 text-sm">Permisos en este grupo</label>
+                <p-multiSelect formControlName="permissions" [options]="groupPermOptions"
+                    optionLabel="label" optionValue="value"
+                    placeholder="Seleccionar permisos..." display="chip" styleClass="w-full"
+                    [filter]="true" filterPlaceholder="Buscar permiso..." [showClear]="true" />
+                <small class="text-500">Estos permisos aplican solo dentro del grupo seleccionado.</small>
+            </div>
+        </div>
+    </form>
+
+    <ng-template #footer>
+        <div class="flex justify-content-end gap-2">
+            <p-button label="Cancelar" severity="secondary" [outlined]="true" (onClick)="closeDialog()" />
+            <p-button label="Guardar" icon="pi pi-check" [loading]="isSaving()" (onClick)="saveGroupPermissions()" />
         </div>
     </ng-template>
 </p-dialog>

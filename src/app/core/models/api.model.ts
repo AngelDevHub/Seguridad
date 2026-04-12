@@ -1,13 +1,22 @@
+// src/app/core/models/api.model.ts
+// Esquema JSON universal del ERP:
+//   { statusCode, intOpCode, timestamp, data }      ← éxito
+//   { statusCode, intOpCode, timestamp, error }     ← error
+
 export interface ApiResponse<T> {
-  success: boolean;
-  opCode: number;
+  statusCode: number;
+  intOpCode: number;
   timestamp: string;
   data: T;
   error?: { message: string };
 }
 
+/**
+ * Respuesta del endpoint POST /auth/login.
+ * NOTA: el JWT ya no viene en el body — está en la cookie HttpOnly 'erp_token'.
+ * Solo retorna el perfil del usuario y sus permisos.
+ */
 export interface LoginApiResponse {
-  access_token: string;
   expires_in: string;
   user: {
     id: string;
@@ -17,4 +26,3 @@ export interface LoginApiResponse {
   };
   permissions: string[];
 }
-

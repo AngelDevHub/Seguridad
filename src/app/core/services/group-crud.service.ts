@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { catchError, map, of, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api.model';
+import { AuthService } from './auth.service';
 
 export interface Group {
   id: string;
@@ -13,23 +14,29 @@ export interface Group {
   miembros: number;
   tickets: number;
   miembrosList: string[]; // emails o usernames de miembros
+  invitedList?: string[];
+  _creadorId?: string;
 }
 
 const STORAGE_KEY = 'groups';
 
+/** Genera un UUID v4 válido usando la API nativa del browser */
 function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  // crypto.randomUUID() disponible en todos los browsers modernos (Chrome 92+, Firefox 95+, Edge 92+)
+  return crypto.randomUUID();
+}
+
+/** Valida si un string es un UUID v4 válido */
+function isValidUUID(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 }
 
 @Injectable({ providedIn: 'root' })
 export class GroupCrudService {
   private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
   private readonly _groups = signal<Group[]>(this.load());
   readonly groups = this._groups.asReadonly();
-
-  constructor() {
-    this.refreshFromBackend();
-  }
 
   private load(): Group[] {
     try {
@@ -37,8 +44,15 @@ export class GroupCrudService {
       if (raw) {
         const parsed: Group[] = JSON.parse(raw);
         if (parsed.length > 0 && !('categoria' in parsed[0])) return this.seedData();
-        // Migrate old data without miembrosList
+        // Migrar datos viejos sin miembrosList
         const migrated = parsed.map(g => ({ ...g, miembrosList: g.miembrosList ?? [] }));
+        // Si hay IDs inválidos (no son UUIDs), limpiar y re-seedar
+        const hasInvalidIds = migrated.some(g => !isValidUUID(g.id));
+        if (hasInvalidIds) {
+          console.warn('[GroupCrudService] IDs inválidos detectados en caché. Limpiando localStorage...');
+          localStorage.removeItem(STORAGE_KEY);
+          return this.seedData();
+        }
         return migrated;
       }
       return this.seedData();
@@ -51,7 +65,7 @@ export class GroupCrudService {
     this.http.get<ApiResponse<any[]>>(`${environment.apiUrl}/groups`).pipe(
       catchError(() => of(null)),
     ).subscribe((res) => {
-      if (!res || !res.success) return;
+      if (!res || !res.data) return;
       const mapped: Group[] = (res.data ?? []).map((g: any) => ({
         id: g.id,
         nombre: g.nombre,
@@ -62,8 +76,18 @@ export class GroupCrudService {
         tickets: g.tickets ?? 0,
         miembrosList: Array.isArray(g.miembrosList) ? g.miembrosList : [],
       }));
-      if (mapped.length) this.persist(mapped);
+      // Al recibir datos del backend, reemplazamos completamente el caché local
+      // (esto limpia cualquier dato de seedData() con IDs falsos)
+      localStorage.removeItem(STORAGE_KEY);
+      this.persist(mapped);
     });
+  }
+
+  removeFromCache(groupId: string): void {
+    const id = String(groupId ?? '').trim();
+    if (!id) return;
+    const next = this._groups().filter((g) => g.id !== id);
+    this.persist(next);
   }
 
   private seedData(): Group[] {
@@ -81,12 +105,34 @@ export class GroupCrudService {
     this._groups.set([...groups]);
   }
 
+  fetchByIdFromBackend(id: string) {
+    return this.http.get<ApiResponse<any>>(`${environment.apiUrl}/groups/${id}`).pipe(
+      map((r) => {
+        if (!r || !r.data) return null;
+        const g = r.data as any;
+        const mapped: Group = {
+          id: g.id,
+          nombre: g.nombre,
+          categoria: g.categoria ?? 'General',
+          nivel: g.nivel ?? 'Básico',
+          autor: g.autor ?? '',
+          miembros: g.miembros ?? 0,
+          tickets: g.tickets ?? 0,
+          miembrosList: Array.isArray(g.miembrosList) ? g.miembrosList : (Array.isArray(g.miembros_list) ? g.miembros_list : []),
+          invitedList: Array.isArray(g.invitedList) ? g.invitedList : (Array.isArray(g.invited_list) ? g.invited_list : []),
+          _creadorId: g._creadorId ?? g.creador_id ?? undefined,
+        };
+        return mapped;
+      }),
+      catchError(() => of(null)),
+    );
+  }
   getById(id: string): Group | undefined {
     return this._groups().find(g => g.id === id);
   }
 
   add(data: Pick<Group, 'nombre' | 'categoria' | 'nivel'> & Partial<Pick<Group, 'autor'>>): Observable<Group | null> {
-    if (localStorage.getItem(environment.jwtKey)) {
+    if (this.auth.isBackendMode() && this.auth.isLogged()) {
       const payload: any = {
         nombre: data.nombre,
         categoria: data.categoria,
@@ -94,7 +140,7 @@ export class GroupCrudService {
       };
       return this.http.post<ApiResponse<Group>>(`${environment.apiUrl}/groups`, payload).pipe(
         map((r) => {
-          if (!r.success) return null;
+          if (!r || !r.data) return null;
           const created = r.data as any as Group;
           const next = [...this._groups().filter((g) => g.id !== created.id), created];
           this.persist(next);
@@ -119,7 +165,7 @@ export class GroupCrudService {
   }
 
   update(id: string, data: Partial<Pick<Group, 'nombre' | 'categoria' | 'nivel'>>): Observable<Group | null> {
-    if (localStorage.getItem(environment.jwtKey)) {
+    if (this.auth.isBackendMode() && this.auth.isLogged()) {
       const payload: any = {};
       if (data.nombre !== undefined) payload.nombre = data.nombre;
       if (data.categoria !== undefined) payload.categoria = data.categoria;
@@ -127,7 +173,7 @@ export class GroupCrudService {
 
       return this.http.patch<ApiResponse<Group>>(`${environment.apiUrl}/groups/${id}`, payload).pipe(
         map((r) => {
-          if (!r.success) return null;
+          if (!r || !r.data) return null;
           const updated = r.data as any as Group;
           const next = this._groups().map((g) => g.id === id ? updated : g);
           this.persist(next);
@@ -146,10 +192,10 @@ export class GroupCrudService {
   }
 
   delete(id: string): Observable<boolean> {
-    if (localStorage.getItem(environment.jwtKey)) {
+    if (this.auth.isBackendMode() && this.auth.isLogged()) {
       return this.http.delete<ApiResponse<any>>(`${environment.apiUrl}/groups/${id}`).pipe(
         map((r) => {
-          if (!r.success) return false;
+          if (!r) return false;
           const filtered = this._groups().filter(g => g.id !== id);
           this.persist(filtered);
           return true;
@@ -165,10 +211,10 @@ export class GroupCrudService {
   }
 
   addMember(groupId: string, email: string): Observable<Group | null> {
-    if (localStorage.getItem(environment.jwtKey)) {
+    if (this.auth.isBackendMode() && this.auth.isLogged()) {
       return this.http.post<ApiResponse<Group>>(`${environment.apiUrl}/groups/${groupId}/members`, { email }).pipe(
         map((r) => {
-          if (!r.success) return null;
+          if (!r || !r.data) return null;
           const updated = r.data as any as Group;
           const next = this._groups().map((g) => g.id === groupId ? updated : g);
           this.persist(next);
@@ -189,10 +235,10 @@ export class GroupCrudService {
   }
 
   removeMember(groupId: string, email: string): Observable<Group | null> {
-    if (localStorage.getItem(environment.jwtKey)) {
+    if (this.auth.isBackendMode() && this.auth.isLogged()) {
       return this.http.delete<ApiResponse<Group>>(`${environment.apiUrl}/groups/${groupId}/members/${encodeURIComponent(email)}`).pipe(
         map((r) => {
-          if (!r.success) return null;
+          if (!r || !r.data) return null;
           const updated = r.data as any as Group;
           const next = this._groups().map((g) => g.id === groupId ? updated : g);
           this.persist(next);

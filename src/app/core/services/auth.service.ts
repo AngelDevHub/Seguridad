@@ -10,9 +10,9 @@
 // idénticos para no romper los componentes de PrimeNG ya existentes.
 // ─────────────────────────────────────────────────────────────────────────────
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap, catchError, of, map } from 'rxjs';
+import { Observable, tap, catchError, of, map, throwError } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { ALL_PERMISSIONS } from './permissions.service';
@@ -37,29 +37,50 @@ export interface AppUser {
   fechaNacimiento?: string;
 }
 
-const STORAGE_KEY     = 'users';
+const STORAGE_KEY = 'users';
+const AUTH_MODE_KEY = 'erp.authMode';
+type AuthMode = 'backend' | 'local';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly http   = inject(HttpClient);
+  private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
 
-  // ── JWT real ────────────────────────────────────────────────────────────────
+  // ── JWT via Cookie HttpOnly ─────────────────────────────────────────────────────
+  // El token JWT es gestionado por el navegador como cookie HttpOnly.
+  // ms-users lo emite en Set-Cookie al hacer login.
+  // El interceptor de Angular envía la cookie automáticamente (withCredentials).
+  // Angular NO tiene acceso a la cookie (es HttpOnly) — esto es intencional.
 
-  /** Guarda el JWT en localStorage tras un login exitoso con el backend */
-  private saveToken(token: string): void {
-    localStorage.setItem(environment.jwtKey, token);
-  }
-
-  /** Obtiene el token actual (usado por el interceptor) */
-  getToken(): string | null {
-    return localStorage.getItem(environment.jwtKey);
-  }
-
-  /** ¿Hay una sesión activa? (token O flag legacy) */
+  /** ¿Hay una sesión activa? Verifica el perfil guardado en sessionStorage */
   isLogged(): boolean {
-    return !!localStorage.getItem(environment.jwtKey) ||
-           localStorage.getItem('logged') === 'true';
+    return (
+      !!sessionStorage.getItem(environment.currentUserKey) ||
+      !!localStorage.getItem(environment.currentUserKey) ||
+      (localStorage.getItem('logged') === 'true' && !!localStorage.getItem('currentUserEmail'))
+    );
+  }
+
+  isBackendMode(): boolean {
+    return localStorage.getItem(AUTH_MODE_KEY) === 'backend';
+  }
+
+  private persistCurrentUser(profile: any, mode: AuthMode): void {
+    const raw = JSON.stringify(profile);
+    sessionStorage.setItem(environment.currentUserKey, raw);
+    localStorage.setItem(environment.currentUserKey, raw);
+    localStorage.setItem(AUTH_MODE_KEY, mode);
+    localStorage.setItem('logged', 'true');
+    if (profile?.email) localStorage.setItem('currentUserEmail', String(profile.email));
+  }
+
+  clearLocalSession(): void {
+    sessionStorage.removeItem(environment.currentUserKey);
+    localStorage.removeItem(environment.currentUserKey);
+    localStorage.removeItem(environment.jwtKey);
+    localStorage.removeItem(AUTH_MODE_KEY);
+    localStorage.removeItem('logged');
+    localStorage.removeItem('currentUserEmail');
   }
 
   // ── Login contra el API Gateway → ms-users ──────────────────────────────────
@@ -77,19 +98,16 @@ export class AuthService {
       )
       .pipe(
         tap((response) => {
-          if (response.success && response.data.access_token) {
-            this.saveToken(response.data.access_token);
-            localStorage.setItem(
-              environment.currentUserKey,
-              JSON.stringify({ ...response.data.user, permissions: response.data.permissions ?? [] }),
+          if (response && response.data) {
+            // El JWT ya está en la cookie HttpOnly — solo guardamos el perfil
+            this.persistCurrentUser(
+              { ...response.data.user, permissions: response.data.permissions ?? [] },
+              'backend',
             );
-            // Compatibilidad con guard legacy
-            localStorage.setItem('logged', 'true');
-            localStorage.setItem('currentUserEmail', response.data.user.email);
           }
         }),
         map((response) => {
-          if (!response.success) return null;
+          if (!response || !response.data) return null;
           return {
             id: response.data.user.id,
             email: response.data.user.email,
@@ -100,7 +118,13 @@ export class AuthService {
             active: true,
           } satisfies AppUser;
         }),
-        catchError(() => of(null)),
+        catchError((err: unknown) => {
+          const httpErr = err as HttpErrorResponse;
+          if (httpErr?.status === 0 || httpErr?.status === 502 || httpErr?.status === 503) {
+            return of(null);
+          }
+          return throwError(() => err);
+        }),
       );
   }
 
@@ -166,10 +190,10 @@ export class AuthService {
 
   getUserByIdWithBackend(id: string): Observable<AppUser | null> {
     return this.http.get<ApiResponse<any>>(`${environment.apiUrl}/users/${id}`).pipe(
-      map((r) => (r.success ? this.mapBackendUser(r.data) : null)),
+      map((r) => (r && r.data ? this.mapBackendUser(r.data) : null)),
       tap((u) => {
         if (!u) return;
-        localStorage.setItem(
+        sessionStorage.setItem(
           environment.currentUserKey,
           JSON.stringify({
             id: u.id,
@@ -192,7 +216,7 @@ export class AuthService {
     return this.http
       .get<ApiResponse<any[]>>(`${environment.apiUrl}/users`)
       .pipe(
-        map((r) => (r.success ? (r.data ?? []).map((u) => this.mapBackendUser(u)) : [])),
+        map((r) => (r && r.data ? (r.data ?? []).map((u) => this.mapBackendUser(u)) : [])),
         catchError(() => of([])),
       );
   }
@@ -207,7 +231,7 @@ export class AuthService {
       permissions: data.permissions ?? [],
     };
     return this.http.post<ApiResponse<any>>(`${environment.apiUrl}/users`, payload).pipe(
-      map((r) => (r.success ? this.mapBackendUser(r.data) : null)),
+      map((r) => (r && r.data ? this.mapBackendUser(r.data) : null)),
       catchError(() => of(null)),
     );
   }
@@ -226,7 +250,7 @@ export class AuthService {
     if (data.permissions !== undefined) payload.permissions = data.permissions;
 
     return this.http.patch<ApiResponse<any>>(`${environment.apiUrl}/users/${id}`, payload).pipe(
-      map((r) => (r.success ? this.mapBackendUser(r.data) : null)),
+      map((r) => (r && r.data ? this.mapBackendUser(r.data) : null)),
       catchError(() => of(null)),
     );
   }
@@ -250,8 +274,21 @@ export class AuthService {
       (u) => u.email === email && u.password === password && u.active,
     );
     if (match) {
-      localStorage.setItem('logged', 'true');
-      localStorage.setItem('currentUserEmail', email);
+      const username = match.usuario ?? match.username ?? String(match.email).split('@')[0] ?? match.email;
+      this.persistCurrentUser(
+        {
+          id: match.id ?? null,
+          nombre_completo: match.nombreCompleto ?? '',
+          username,
+          email: match.email,
+          permissions: match.permissions ?? [],
+          telefono: match.telefono ?? '',
+          direccion: match.direccion ?? '',
+          fecha_inicio: match.fechaInicio ?? null,
+          fecha_nacimiento: match.fechaNacimiento ?? null,
+        },
+        'local',
+      );
       return match;
     }
     return null;
@@ -259,10 +296,11 @@ export class AuthService {
 
   // ── Perfil del usuario actual ─────────────────────────────────────────────
 
-  /** Obtiene el perfil del usuario backeado (desde localStorage o mock) */
+  /** Obtiene el perfil del usuario backeado (desde sessionStorage o localStorage) */
   getCurrentUser(): AppUser | null {
-    // Primero intentar desde la sesión real del backend
-    const backendUser = localStorage.getItem(environment.currentUserKey);
+    // Primero intentar desde sesión (backend real)
+    const backendUser = sessionStorage.getItem(environment.currentUserKey)
+      ?? localStorage.getItem(environment.currentUserKey);
     if (backendUser) {
       try {
         const parsed = JSON.parse(backendUser);
@@ -270,18 +308,18 @@ export class AuthService {
         const edad = this.computeAge(fechaNacimiento);
         // Mapear al formato AppUser para compatibilidad
         return {
-          id:             parsed.id,
-          email:          parsed.email,
-          password:       '',
+          id: parsed.id,
+          email: parsed.email,
+          password: '',
           nombreCompleto: parsed.nombre_completo,
-          usuario:        parsed.username,
-          username:       parsed.username,
-          telefono:       parsed.telefono ?? undefined,
-          direccion:      parsed.direccion ?? undefined,
-          edad:           typeof edad === 'number' ? edad : undefined,
-          permissions:    parsed.permissions ?? [],
-          active:         true,
-          fechaInicio:    parsed.fecha_inicio ?? undefined,
+          usuario: parsed.username,
+          username: parsed.username,
+          telefono: parsed.telefono ?? undefined,
+          direccion: parsed.direccion ?? undefined,
+          edad: typeof edad === 'number' ? edad : undefined,
+          permissions: parsed.permissions ?? [],
+          active: true,
+          fechaInicio: parsed.fecha_inicio ?? undefined,
           fechaNacimiento: parsed.fecha_nacimiento ?? undefined,
         };
       } catch { /* fallback al mock */ }
@@ -293,12 +331,84 @@ export class AuthService {
     return this.getUsers().find((u) => u.email === email) ?? null;
   }
 
-  // ── Logout ────────────────────────────────────────────────────────────────
+  getMyGroupPermissions(groupId: string): Observable<string[]> {
+    if (!this.isBackendMode() || !this.isLogged()) return of([]);
+    const id = String(groupId ?? '').trim();
+    if (!id) return of([]);
+    return this.http.get<ApiResponse<string[]>>(`${environment.apiUrl}/users/me/group-permissions/${id}`).pipe(
+      map((r) => (r && Array.isArray(r.data) ? r.data : [])),
+      catchError(() => of([])),
+    );
+  }
+
+  getMeWithBackend(): Observable<AppUser | null> {
+    if (!this.isBackendMode() || !this.isLogged()) return of(null);
+    return this.http.get<ApiResponse<any>>(`${environment.apiUrl}/users/me`).pipe(
+      map((r) => (r && r.data ? this.mapBackendUser(r.data) : null)),
+      catchError(() => of(null)),
+    );
+  }
+
+  refreshMeFromBackend(): Observable<AppUser | null> {
+    return this.getMeWithBackend().pipe(
+      tap((u) => {
+        if (!u) return;
+        this.persistCurrentUser(
+          {
+            id: u.id,
+            nombre_completo: u.nombreCompleto ?? '',
+            username: u.username ?? '',
+            email: u.email,
+            permissions: u.permissions ?? [],
+            telefono: u.telefono ?? '',
+            direccion: u.direccion ?? '',
+            fecha_inicio: u.fechaInicio ?? null,
+            fecha_nacimiento: u.fechaNacimiento ?? null,
+          },
+          'backend',
+        );
+      }),
+    );
+  }
+
+  getUserGroupPermissions(userId: string, groupId: string): Observable<string[]> {
+    if (!this.isBackendMode() || !this.isLogged()) return of([]);
+    const u = String(userId ?? '').trim();
+    const g = String(groupId ?? '').trim();
+    if (!u || !g) return of([]);
+    return this.http.get<ApiResponse<string[]>>(`${environment.apiUrl}/users/${u}/group-permissions/${g}`).pipe(
+      map((r) => (r && Array.isArray(r.data) ? r.data : [])),
+      catchError(() => of([])),
+    );
+  }
+
+  setUserGroupPermissions(userId: string, groupId: string, permissions: string[]): Observable<string[]> {
+    if (!this.isBackendMode() || !this.isLogged()) return of([]);
+    const u = String(userId ?? '').trim();
+    const g = String(groupId ?? '').trim();
+    if (!u || !g) return of([]);
+    return this.http.put<ApiResponse<string[]>>(
+      `${environment.apiUrl}/users/${u}/group-permissions/${g}`,
+      { permissions: permissions ?? [] },
+    ).pipe(
+      map((r) => (r && Array.isArray(r.data) ? r.data : [])),
+      catchError(() => of([])),
+    );
+  }
+
+  // ── Logout ──────────────────────────────────────────────────────────────────────
 
   logout(): void {
-    // Limpiar tokens reales
-    localStorage.removeItem(environment.jwtKey);
+    // Llamar al endpoint de logout del Gateway para que NestJS limpie la cookie
+    // HttpOnly en el servidor (el navegador no puede limpiar HttpOnly cookies)
+    this.http.post(`${environment.apiUrl}/users/auth/logout`, {}, { withCredentials: true })
+      .subscribe({ error: () => { } }); // fire-and-forget
+
+    // Limpiar el perfil local
+    sessionStorage.removeItem(environment.currentUserKey);
     localStorage.removeItem(environment.currentUserKey);
+    localStorage.removeItem(environment.jwtKey);
+    localStorage.removeItem(AUTH_MODE_KEY);
     // Limpiar flags legacy
     localStorage.removeItem('logged');
     localStorage.removeItem('currentUserEmail');
@@ -368,7 +478,7 @@ export class AuthService {
 
   updateUser(originalEmail: string, data: Partial<AppUser>): { ok: boolean; reason?: string } {
     const users = this.getUsers();
-    const idx   = users.findIndex((u) => u.email === originalEmail);
+    const idx = users.findIndex((u) => u.email === originalEmail);
     if (idx === -1) return { ok: false, reason: 'not_found' };
     if (data.email && data.email !== originalEmail && users.find((u) => u.email === data.email)) {
       return { ok: false, reason: 'email_taken' };
@@ -381,7 +491,7 @@ export class AuthService {
 
   updateUserPermissions(email: string, permissions: string[]): boolean {
     const users = this.getUsers();
-    const idx   = users.findIndex((u) => u.email === email);
+    const idx = users.findIndex((u) => u.email === email);
     if (idx === -1) return false;
     users[idx] = { ...users[idx], permissions };
     this.saveUsers(users);
@@ -390,7 +500,7 @@ export class AuthService {
 
   toggleUserActive(email: string): boolean {
     const users = this.getUsers();
-    const idx   = users.findIndex((u) => u.email === email);
+    const idx = users.findIndex((u) => u.email === email);
     if (idx === -1) return false;
     users[idx] = { ...users[idx], active: !users[idx].active };
     this.saveUsers(users);
